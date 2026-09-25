@@ -1,4 +1,5 @@
 import * as Device from 'expo-device';
+import { Link } from 'expo-router';
 import { Platform, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -55,6 +56,12 @@ export default function HomeScreen() {
           />
         </ThemedView>
 
+        {/* Link temporário para testar a tela de cadastro - remover ou mover
+            para dentro da navegação real do app quando o fluxo estiver definido. */}
+        <Link href="/cadastro-cliente" style={styles.linkCadastro}>
+          <ThemedText type="code">ir para cadastro de cliente →</ThemedText>
+        </Link>
+
         {Platform.OS === 'web' && <WebBadge />}
       </SafeAreaView>
     </ThemedView>
@@ -94,5 +101,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.four,
     borderRadius: Spacing.four,
+  },
+  linkCadastro: {
+    marginTop: Spacing.three,
   },
 });
