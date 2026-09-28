@@ -1,78 +1,74 @@
 // src/api/client.ts
 //
-// Ponto único de configuração da API. Trocar a URL base (por exemplo,
-// de desenvolvimento local para produção) muda só aqui - nenhum outro
-// arquivo do app deve montar URL de API na mão.
+// Cliente HTTP usado pela sincronização e pelas telas que preferem a
+// interface { method, body }. Por baixo, usa o apiFetch do auth.ts:
+// mesmo endereço (EXPO_PUBLIC_API_URL no .env), mesmo token e renovação
+// automática do login. Não existe mais endereço fixo aqui.
 
-import { obterToken } from "../storage/authStorage";
+import { API_URL, ApiError, SessaoExpiradaError, apiFetch as fetchAutenticado } from "./auth";
 
-// IMPORTANTE (desenvolvimento local):
-// Ao testar no celular físico via Expo Go, "localhost" aponta para o
-// PRÓPRIO CELULAR, não para o seu PC. Troque pelo IP local da sua
-// máquina na rede Wi-Fi (ex: 192.168.0.15) e rode o Django com:
-//   python manage.py runserver 0.0.0.0:8000
-// e inclua esse IP em ALLOWED_HOSTS no settings.py do Django.
-const API_BASE_URL = "http://192.168.0.2:8000/api/v1";
-
-export class ApiError extends Error {
-  status: number;
-  constructor(status: number, message: string) {
-    super(message);
-    this.status = status;
-  }
-}
+export { ApiError, SessaoExpiradaError };
 
 interface OpcoesRequisicao {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
-  autenticado?: boolean; // default true - a maioria dos endpoints exige login
+  autenticado?: boolean; // padrão true - a maioria dos endpoints exige login
+}
+
+function primeiraMensagem(data: unknown): string | null {
+  if (typeof data === "string") return data;
+  if (Array.isArray(data)) {
+    for (const v of data) {
+      const m = primeiraMensagem(v);
+      if (m) return m;
+    }
+  } else if (data && typeof data === "object") {
+    for (const v of Object.values(data)) {
+      const m = primeiraMensagem(v);
+      if (m) return m;
+    }
+  }
+  return null;
 }
 
 /**
- * Cliente HTTP central. Injeta o token automaticamente quando
- * `autenticado` é true (padrão), monta a URL completa e já trata
- * erros HTTP transformando em ApiError com uma mensagem legível.
+ * Faz a requisição e devolve o JSON da resposta.
+ * Erros viram ApiError; status 0 significa "sem conexão".
  */
-export async function apiFetch<T = unknown>(
-  caminho: string,
-  opcoes: OpcoesRequisicao = {}
-): Promise<T> {
+export async function apiFetch<T = unknown>(caminho: string, opcoes: OpcoesRequisicao = {}): Promise<T> {
   const { method = "GET", body, autenticado = true } = opcoes;
-
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
+  const init: RequestInit = {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
   };
-
-  if (autenticado) {
-    const token = await obterToken();
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
-  }
 
   let resposta: Response;
   try {
-    resposta = await fetch(`${API_BASE_URL}${caminho}`, {
-      method,
-      headers,
-      body: body ? JSON.stringify(body) : undefined,
-    });
-  } catch {
-    throw new ApiError(0, "Sem conexão com o servidor");
+    resposta = autenticado
+      ? await fetchAutenticado(caminho, init)
+      : await fetch(`${API_URL}${caminho}`, init);
+  } catch (e) {
+    if (e instanceof ApiError || e instanceof SessaoExpiradaError) throw e;
+    throw new ApiError(0, null, "Sem conexão com o servidor");
+  }
+
+  const texto = await resposta.text();
+  let data: any = null;
+  if (texto) {
+    try {
+      data = JSON.parse(texto);
+    } catch {
+      data = null; // resposta que não é JSON (ex: página de erro do Nginx)
+    }
   }
 
   if (!resposta.ok) {
-    let mensagem = `Erro ${resposta.status}`;
-    try {
-      const corpoErro = await resposta.json();
-      mensagem = corpoErro.detail || corpoErro.message || mensagem;
-    } catch {
-      // corpo de erro não era JSON válido - mantém a mensagem genérica
-    }
-    throw new ApiError(resposta.status, mensagem);
+    throw new ApiError(
+      resposta.status,
+      data,
+      primeiraMensagem(data) ?? `O servidor respondeu com erro ${resposta.status}.`
+    );
   }
-
-  // Requisições como DELETE costumam voltar sem corpo
-  const texto = await resposta.text();
-  return texto ? JSON.parse(texto) : (undefined as T);
+  return data as T;
 }

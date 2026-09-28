@@ -1,108 +1,159 @@
-import * as Device from 'expo-device';
-import { Link } from 'expo-router';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+// src/app/index.tsx  (tela inicial, depois do login)
+//
+// Mostra as ações do app na ordem em que o vidraceiro trabalha:
+// primeiro o cliente, depois o projeto para esse cliente.
+// O catálogo de produtos fica separado, porque é montado uma vez e reutilizado.
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Href, useRouter } from 'expo-router';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
+import { useAuth } from '@/auth/AuthContext';
+
+const COR = {
+  borda: '#1E5B57',
+  bordaClara: '#E3EEEC',
+  fundo: '#F1F5F4',
+  superficie: '#FFFFFF',
+  linha: '#D6E1DF',
+  tinta: '#16292B',
+  tintaSuave: '#546B6D',
+};
+
+type Acao = {
+  titulo: string;
+  descricao: string;
+  destino: Href;
+  disponivel: boolean;
+};
+
+const DIA_A_DIA: Acao[] = [
+    {
+    titulo: 'Clientes',
+    descricao: 'Cadastre e consulte quem recebe seus orçamentos.',
+    destino: '/clientes',
+    disponivel: true,
+  },
+  {
+    titulo: 'Projetos',
+    descricao: 'Escolha um cliente e adicione janelas, portas e boxes com as medidas.',
+    destino: '/projetos',
+    disponivel: true,
   }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
+];
+
+const CATALOGO: Acao[] = [
+  {
+    titulo: 'Produtos',
+    descricao: 'Monte seus modelos com os perfis, acessórios e vedações de cada um.',
+    destino: '/produtos',
+    disponivel: true,
+  },
+];
+
+function primeiroNome(nome?: string) {
+  return nome?.trim().split(/\s+/)[0] ?? '';
+}
+
+function Linha({ acao }: { acao: Acao }) {
+  const router = useRouter();
   return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
+    <Pressable
+      disabled={!acao.disponivel}
+      onPress={() => router.push(acao.destino)}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: !acao.disponivel }}
+      style={({ pressed }) => [styles.linha, pressed && { backgroundColor: COR.bordaClara }]}
+    >
+      <View style={styles.linhaTexto}>
+        <Text style={[styles.linhaTitulo, !acao.disponivel && { color: COR.tintaSuave }]}>
+          {acao.titulo}
+        </Text>
+        <Text style={styles.linhaDescricao}>{acao.descricao}</Text>
+      </View>
+      {acao.disponivel ? (
+        <Text style={styles.seta}>›</Text>
+      ) : (
+        <Text style={styles.emBreve}>Em breve</Text>
+      )}
+    </Pressable>
   );
 }
 
-export default function HomeScreen() {
+function Grupo({ titulo, acoes }: { titulo: string; acoes: Acao[] }) {
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
+    <View style={styles.grupo}>
+      <Text style={styles.grupoTitulo}>{titulo}</Text>
+      <View style={styles.grupoCaixa}>
+        {acoes.map((a, i) => (
+          <View key={a.titulo}>
+            {i > 0 && <View style={styles.divisor} />}
+            <Linha acao={a} />
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
+export default function Inicio() {
+  const { vidraceiro, sair } = useAuth();
 
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
+  return (
+    <ScrollView style={styles.tela} contentContainerStyle={styles.conteudo}>
+      <View style={styles.cabecalho}>
+        <Text style={styles.ola}>Olá, {primeiroNome(vidraceiro?.nome)}</Text>
+        {!!vidraceiro?.empresa && <Text style={styles.empresa}>{vidraceiro.empresa}</Text>}
+      </View>
 
-        {/* Link temporário para testar a tela de cadastro - remover ou mover
-            para dentro da navegação real do app quando o fluxo estiver definido. */}
-        <Link href="/cadastro-cliente" style={styles.linkCadastro}>
-          <ThemedText type="code">ir para cadastro de cliente →</ThemedText>
-        </Link>
+      <Grupo titulo="Atendimento" acoes={DIA_A_DIA} />
+      <Grupo titulo="Seu catálogo" acoes={CATALOGO} />
 
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
+      <Pressable onPress={sair} accessibilityRole="button" style={styles.sair} hitSlop={8}>
+        <Text style={styles.sairTexto}>Sair da conta</Text>
+      </Pressable>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
+  tela: { flex: 1, backgroundColor: COR.fundo },
+  conteudo: { paddingBottom: 40 },
+  cabecalho: {
+    backgroundColor: COR.borda,
+    paddingTop: 72,
+    paddingBottom: 28,
+    paddingHorizontal: 24,
+  },
+  ola: { color: '#FFFFFF', fontSize: 30, fontWeight: '800', letterSpacing: -0.8 },
+  empresa: { color: '#D5E6E3', fontSize: 15, marginTop: 4 },
+  grupo: { marginTop: 28, paddingHorizontal: 16 },
+  grupoTitulo: {
+    color: COR.tintaSuave,
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+    marginLeft: 8,
+  },
+  grupoCaixa: {
+    backgroundColor: COR.superficie,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COR.linha,
+    overflow: 'hidden',
+  },
+  divisor: { height: 1, backgroundColor: COR.linha, marginLeft: 16 },
+  linha: {
     flexDirection: 'row',
-  },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
     alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    minHeight: 64,
   },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
-  },
-  title: {
-    textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
-  },
-  linkCadastro: {
-    marginTop: Spacing.three,
-  },
+  linhaTexto: { flex: 1, paddingRight: 12 },
+  linhaTitulo: { color: COR.tinta, fontSize: 17, fontWeight: '700' },
+  linhaDescricao: { color: COR.tintaSuave, fontSize: 14, lineHeight: 20, marginTop: 2 },
+  seta: { color: COR.borda, fontSize: 28, fontWeight: '300' },
+  emBreve: { color: COR.tintaSuave, fontSize: 13 },
+  sair: { alignSelf: 'center', marginTop: 36, padding: 8 },
+  sairTexto: { color: COR.borda, fontSize: 15, fontWeight: '600' },
 });

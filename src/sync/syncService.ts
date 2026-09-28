@@ -1,50 +1,46 @@
 // src/sync/syncService.ts
 //
-// Varre a fila_sync e tenta enviar cada ação pendente para a API.
-// Chamado (a) quando o app detecta que a conexão voltou, e (b)
-// opcionalmente em um intervalo periódico enquanto o app está aberto.
+// Sincronização em duas direções, sempre com o vidraceiro logado:
+//   1. ENVIAR: varre a fila_sync DESTE vidraceiro e manda cada ação à API.
+//   2. BAIXAR: busca no servidor o que mudou desde a última vez (clientes
+//      criados no site ou em outro aparelho) e grava no celular.
 //
-// Cada tipo de ação (criar_cliente, editar_cliente, ...) tem seu próprio
-// "executor". Adicionar um novo tipo de sincronização = adicionar uma
-// nova entrada no mapa EXECUTORES, sem mexer no restante do serviço.
+// Cada tipo de ação (criar_cliente, ...) tem seu próprio "executor".
+// Adicionar um novo tipo = adicionar uma entrada em EXECUTORES.
 
-import { ApiError, apiFetch } from "../api/client";
-import { marcarClienteSincronizado } from "../storage/clientesRepository";
+import { ApiError, SessaoExpiradaError, apiFetch } from "../api/client";
+import {
+  ClienteApi,
+  aplicarClientesDoServidor,
+  marcarClienteSincronizado,
+  vidraceiroAtualId,
+} from "../storage/clientesRepository";
 import { getDatabase } from "../storage/database";
-import { salvarUltimaSincronizacao } from "../storage/preferenciasStorage";
+import { obterCursor, salvarCursor, salvarUltimaSincronizacao } from "../storage/preferenciasStorage";
 
 interface ItemFila {
   id: number;
   tipo_acao: string;
   entidade: string;
-  entidade_local_id: number;
+  entidade_id: string;
   payload: string;
   tentativas: number;
 }
 
+// Tentativas contam só quando o SERVIDOR recusa (dados inválidos, erro
+// interno). Falta de internet não gasta tentativa: o item espera o tempo
+// que for preciso.
 const MAX_TENTATIVAS = 5;
 
 type Executor = (item: ItemFila) => Promise<void>;
 
 const EXECUTORES: Record<string, Executor> = {
   criar_cliente: async (item) => {
-    const dados = JSON.parse(item.payload);
-
-    // Ajuste os nomes de campo aqui para bater com o que sua API Django
-    // espera (ex: se o serializer usar snake_case em vez de camelCase).
-    const clienteCriado = await apiFetch<{ id: number }>("/clientes/", {
-      method: "POST",
-      body: dados,
-    });
-
-    await marcarClienteSincronizado(item.entidade_local_id, clienteCriado.id);
+    // O payload já está no formato da API, com o id gerado no celular.
+    // Se este cliente já chegou antes, o servidor responde 200 sem duplicar.
+    await apiFetch("/clientes/", { method: "POST", body: JSON.parse(item.payload) });
+    await marcarClienteSincronizado(item.entidade_id);
   },
-
-  // Exemplo de como um segundo tipo de ação seria adicionado no futuro:
-  // editar_cliente: async (item) => {
-  //   const dados = JSON.parse(item.payload);
-  //   await apiFetch(`/clientes/${dados.servidorId}/`, { method: "PATCH", body: dados });
-  // },
 };
 
 export interface ResultadoSincronizacao {
@@ -52,16 +48,15 @@ export interface ResultadoSincronizacao {
   falharam: number;
 }
 
-/**
- * Processa a fila de sincronização inteira, um item por vez, na ordem
- * em que foram criados. Itens que falham continuam na fila para a
- * próxima tentativa, até o limite de MAX_TENTATIVAS.
- */
-export async function sincronizar(): Promise<ResultadoSincronizacao> {
+function semConexao(erro: unknown): boolean {
+  return erro instanceof SessaoExpiradaError || (erro instanceof ApiError && erro.status === 0);
+}
+
+async function enviarPendentes(vidraceiroId: string): Promise<ResultadoSincronizacao> {
   const db = await getDatabase();
   const itens = await db.getAllAsync<ItemFila>(
-    `SELECT * FROM fila_sync WHERE tentativas < ? ORDER BY criado_em ASC`,
-    [MAX_TENTATIVAS]
+    `SELECT * FROM fila_sync WHERE vidraceiro_id = ? AND tentativas < ? ORDER BY id ASC`,
+    [vidraceiroId, MAX_TENTATIVAS]
   );
 
   let processados = 0;
@@ -69,10 +64,7 @@ export async function sincronizar(): Promise<ResultadoSincronizacao> {
 
   for (const item of itens) {
     const executor = EXECUTORES[item.tipo_acao];
-
     if (!executor) {
-      // Tipo de ação desconhecido não deve travar a fila inteira -
-      // registra o problema e segue para o próximo item.
       console.warn(`Sem executor para tipo_acao "${item.tipo_acao}"`);
       continue;
     }
@@ -83,32 +75,75 @@ export async function sincronizar(): Promise<ResultadoSincronizacao> {
       processados++;
     } catch (erro) {
       falharam++;
-      const mensagemErro = erro instanceof ApiError ? erro.message : String(erro);
-
-      await db.runAsync(
-        `UPDATE fila_sync SET tentativas = tentativas + 1, ultimo_erro = ? WHERE id = ?`,
-        [mensagemErro, item.id]
-      );
-
-      // Erro de rede (status 0) significa "ainda sem conexão" - para
-      // de tentar os próximos itens agora, tentaremos tudo de novo
-      // na próxima chamada de sincronizar().
-      if (erro instanceof ApiError && erro.status === 0) {
+      if (semConexao(erro)) {
+        // Sem internet (ou login expirado): para aqui, sem gastar tentativa.
         break;
       }
+      const mensagem = erro instanceof Error ? erro.message : String(erro);
+      await db.runAsync(
+        `UPDATE fila_sync SET tentativas = tentativas + 1, ultimo_erro = ? WHERE id = ?`,
+        [mensagem, item.id]
+      );
     }
   }
-
-  await salvarUltimaSincronizacao(new Date().toISOString());
   return { processados, falharam };
 }
 
-/** Quantos itens ainda estão esperando para sincronizar (para mostrar um badge na UI, por exemplo). */
+type PaginaClientes = { clientes: ClienteApi[]; proxima: string | null; gerado_em: string };
+
+async function baixarClientes(vidraceiroId: string): Promise<void> {
+  const desde = await obterCursor("clientes", vidraceiroId);
+  let pagina = 1;
+  let marca: string | null = null;
+
+  while (true) {
+    const params = new URLSearchParams({ page: String(pagina), tamanho: "500" });
+    if (desde) params.set("atualizado_desde", desde);
+    const dados = await apiFetch<PaginaClientes>(`/clientes/?${params}`);
+    if (pagina === 1) marca = dados.gerado_em;
+    await aplicarClientesDoServidor(vidraceiroId, dados.clientes);
+    if (!dados.proxima) break;
+    pagina++;
+  }
+  // Só avança a marca se baixou tudo; se falhar no meio, repete na próxima.
+  if (marca) await salvarCursor("clientes", vidraceiroId, marca);
+}
+
+let emAndamento: Promise<ResultadoSincronizacao> | null = null;
+
+/**
+ * Envia as pendências e baixa as novidades do vidraceiro logado.
+ * Se já houver uma sincronização rodando, devolve a mesma (não duplica).
+ */
+export function sincronizar(): Promise<ResultadoSincronizacao> {
+  if (!emAndamento) {
+    emAndamento = (async () => {
+      const vidraceiroId = await vidraceiroAtualId();
+      if (!vidraceiroId) return { processados: 0, falharam: 0 };
+
+      const resultado = await enviarPendentes(vidraceiroId);
+      try {
+        await baixarClientes(vidraceiroId);
+      } catch (erro) {
+        if (!semConexao(erro)) console.warn("Falha ao baixar clientes:", erro);
+      }
+      await salvarUltimaSincronizacao(new Date().toISOString());
+      return resultado;
+    })().finally(() => {
+      emAndamento = null;
+    });
+  }
+  return emAndamento;
+}
+
+/** Quantos itens do vidraceiro logado ainda esperam envio (para um aviso na tela). */
 export async function contarPendentesSincronizacao(): Promise<number> {
+  const vidraceiroId = await vidraceiroAtualId();
+  if (!vidraceiroId) return 0;
   const db = await getDatabase();
-  const resultado = await db.getFirstAsync<{ total: number }>(
-    `SELECT COUNT(*) as total FROM fila_sync WHERE tentativas < ?`,
-    [MAX_TENTATIVAS]
+  const r = await db.getFirstAsync<{ total: number }>(
+    `SELECT COUNT(*) as total FROM fila_sync WHERE vidraceiro_id = ? AND tentativas < ?`,
+    [vidraceiroId, MAX_TENTATIVAS]
   );
-  return resultado?.total ?? 0;
+  return r?.total ?? 0;
 }

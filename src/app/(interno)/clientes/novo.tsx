@@ -1,41 +1,40 @@
-// src/app/(interno)/clientes/novo.tsx
+// src/app/(interno)/clientes/novo.tsx  ->  rota /clientes/novo
 //
-// Tela interna: um usuário da equipe (vendedor, atendente) cadastra
-// um cliente em nome dele. Reaproveita o MESMO formulário da tela
-// self-service - só muda o texto do botão e um campo extra opcional.
+// O vidraceiro cadastra um cliente dele. Salva no celular primeiro
+// (funciona sem internet) e enfileira o envio ao servidor.
 
-import React from "react";
-import { View, Text, ScrollView, StyleSheet } from "react-native";
-import { router } from "expo-router";
-import { CadastroClienteForm, DadosCliente } from "../../../components/CadastroClienteForm";
+import { Stack, useRouter } from 'expo-router';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
 
-export default function NovoClienteInternoScreen() {
+import { CadastroClienteForm, DadosCliente } from '@/components/CadastroClienteForm';
+import { COR } from '@/components/produtos/cores';
+import { salvarClienteLocal } from '@/storage/clientesRepository';
+import { sincronizar } from '@/sync/syncService';
+
+export default function NovoCliente() {
+  const router = useRouter();
+
   async function handleCadastrar(dados: DadosCliente) {
-    // TODO: chamada real à API, autenticada com o token do usuário interno
-    // logado (o header Authorization deve ser incluído aqui, ou melhor
-    // ainda, num cliente HTTP central que já injeta o token automaticamente).
-    console.log("Cadastro interno de cliente:", dados);
+    // 1. Grava no celular e na fila. Se isto falhar, o formulário mostra o erro.
+    await salvarClienteLocal(dados);
 
-    await new Promise((resolve) => setTimeout(resolve, 800));
+    // 2. Tenta enviar agora, sem esperar: se estiver sem internet, o
+    //    cadastro continua seguro na fila e vai quando a conexão voltar.
+    sincronizar().catch(() => {});
 
     router.back();
   }
 
   return (
-    <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
-      <View style={styles.cabecalho}>
-        <Text style={styles.titulo}>Novo cliente</Text>
-        <Text style={styles.subtitulo}>Cadastro realizado pela equipe.</Text>
-      </View>
-
-      <CadastroClienteForm onSubmeter={handleCadastrar} textoBotao="Salvar cliente" />
-    </ScrollView>
+    <KeyboardAvoidingView style={styles.tela} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Stack.Screen options={{ headerShown: true, title: 'Novo cliente' }} />
+      <ScrollView keyboardShouldPersistTaps="handled">
+        <CadastroClienteForm onSubmeter={handleCadastrar} textoBotao="Salvar cliente" />
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f7f7f7" },
-  cabecalho: { padding: 16, paddingTop: 24 },
-  titulo: { fontSize: 24, fontWeight: "800", color: "#111" },
-  subtitulo: { fontSize: 14, color: "#666", marginTop: 4 },
+  tela: { flex: 1, backgroundColor: COR.fundo },
 });

@@ -1,11 +1,11 @@
 // src/components/CadastroClienteForm.tsx
 //
 // Formulário reutilizável de cadastro de cliente.
-// Usado tanto pela tela self-service (cliente se cadastra) quanto pela
-// tela interna (equipe cadastra cliente) - a diferença entre os dois
-// fluxos fica na tela que envolve este componente, não aqui dentro.
+// Usado tanto pela criação de conta do vidraceiro (com senha) quanto pela
+// tela interna (vidraceiro cadastra um cliente dele, sem senha) - a
+// diferença entre os dois fluxos fica na tela que envolve este componente.
 
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   View,
   Text,
@@ -14,6 +14,9 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
+  InputAccessoryView,
+  Keyboard,
+  Platform,
 } from "react-native";
 import { SeletorEstado } from "./SeletorEstado";
 
@@ -49,26 +52,39 @@ const DADOS_INICIAIS: DadosCliente = {
 
 type Erros = Partial<Record<keyof DadosCliente, string>>;
 
+// No iPhone, os teclados numéricos não têm tecla de confirmar. Estes
+// campos ganham uma barra com o botão "Concluído" acima do teclado.
+const ID_BARRA_TECLADO = "barra-teclado-cadastro";
+const TECLADOS_SEM_CONFIRMAR = ["numeric", "phone-pad", "number-pad", "decimal-pad"];
+
 interface CadastroClienteFormProps {
   // Chamado quando o formulário passa na validação e o botão é pressionado.
   // A tela que usa este componente decide o que fazer com os dados
   // (chamar a API, etc.) - este componente não sabe nada sobre a API.
-  onSubmeter: (dados: DadosCliente) => Promise<void>;
+  // Quando comSenha está ativo, a senha chega no segundo argumento.
+  onSubmeter: (dados: DadosCliente, senha?: string) => Promise<void>;
   textoBotao?: string;
   // Campos extras que só fazem sentido no cadastro interno
   // (ex: um seletor de vendedor responsável) podem ser injetados aqui.
   camposExtras?: React.ReactNode;
+  // Mostra os campos de senha e confirmação (usado na criação de conta).
+  comSenha?: boolean;
 }
 
 export function CadastroClienteForm({
   onSubmeter,
   textoBotao = "Cadastrar",
   camposExtras,
+  comSenha = false,
 }: CadastroClienteFormProps) {
   const [dados, setDados] = useState<DadosCliente>(DADOS_INICIAIS);
   const [erros, setErros] = useState<Erros>({});
   const [enviando, setEnviando] = useState(false);
   const [buscandoCep, setBuscandoCep] = useState(false);
+  const [senha, setSenha] = useState("");
+  const [confirmarSenha, setConfirmarSenha] = useState("");
+  const [errosSenha, setErrosSenha] = useState<{ senha?: string; confirmar?: string }>({});
+  const numeroRef = useRef<TextInput>(null);
 
   function atualizarCampo<K extends keyof DadosCliente>(campo: K, valor: DadosCliente[K]) {
     setDados((prev) => ({ ...prev, [campo]: valor }));
@@ -119,6 +135,7 @@ export function CadastroClienteForm({
 
       if (json.erro) {
         setErros((prev) => ({ ...prev, cep: "CEP não encontrado" }));
+        Keyboard.dismiss(); // fecha o teclado para o aviso ficar visível
         return;
       }
 
@@ -129,6 +146,9 @@ export function CadastroClienteForm({
         cidade: json.localidade || prev.cidade,
         estado: json.uf || prev.estado,
       }));
+
+      // Endereço preenchido: o próximo dado que falta é o número.
+      numeroRef.current?.focus();
     } catch {
       // Falha de rede na busca de CEP não deve travar o cadastro -
       // o usuário ainda pode preencher o endereço manualmente.
@@ -164,8 +184,23 @@ export function CadastroClienteForm({
     if (!dados.cidade.trim()) novosErros.cidade = "Informe a cidade";
     if (!dados.estado) novosErros.estado = "Selecione o estado";
 
+    const novosErrosSenha: { senha?: string; confirmar?: string } = {};
+    if (comSenha) {
+      if (senha.length < 8) {
+        novosErrosSenha.senha = "A senha precisa ter pelo menos 8 caracteres";
+      } else if (/^\d+$/.test(senha)) {
+        novosErrosSenha.senha = "Use letras além de números";
+      }
+      if (confirmarSenha !== senha) {
+        novosErrosSenha.confirmar = "As senhas não são iguais";
+      }
+    }
+
     setErros(novosErros);
-    return Object.keys(novosErros).length === 0;
+    setErrosSenha(novosErrosSenha);
+    return (
+      Object.keys(novosErros).length === 0 && Object.keys(novosErrosSenha).length === 0
+    );
   }
 
   async function handleSubmeter() {
@@ -173,7 +208,7 @@ export function CadastroClienteForm({
 
     setEnviando(true);
     try {
-      await onSubmeter(dados);
+      await onSubmeter(dados, comSenha ? senha : undefined);
     } catch (erro) {
       Alert.alert(
         "Erro ao cadastrar",
@@ -265,7 +300,10 @@ export function CadastroClienteForm({
             onAlterar={(v) => atualizarCampo("numero", v)}
             erro={erros.numero}
             placeholder="123"
-            teclado="numeric"
+            // Aceita letras também: endereços como "S/N" ou "120-A".
+            teclado="numbers-and-punctuation"
+            autoCapitalizar="characters"
+            refInput={numeroRef}
           />
         </View>
         <View style={styles.colunaGrande}>
@@ -297,7 +335,44 @@ export function CadastroClienteForm({
         erro={erros.estado}
       />
 
+      {comSenha && (
+        <>
+          <Text style={styles.secao}>Acesso ao app</Text>
+          <Campo
+            label="Senha"
+            valor={senha}
+            onAlterar={(v) => {
+              setSenha(v);
+              if (errosSenha.senha) setErrosSenha((p) => ({ ...p, senha: undefined }));
+            }}
+            erro={errosSenha.senha}
+            placeholder="Pelo menos 8 caracteres"
+            senha
+          />
+          <Campo
+            label="Confirme a senha"
+            valor={confirmarSenha}
+            onAlterar={(v) => {
+              setConfirmarSenha(v);
+              if (errosSenha.confirmar) setErrosSenha((p) => ({ ...p, confirmar: undefined }));
+            }}
+            erro={errosSenha.confirmar}
+            senha
+          />
+        </>
+      )}
+
       {camposExtras}
+
+      {Platform.OS === "ios" && (
+        <InputAccessoryView nativeID={ID_BARRA_TECLADO}>
+          <View style={styles.barraTeclado}>
+            <TouchableOpacity onPress={Keyboard.dismiss} hitSlop={10}>
+              <Text style={styles.barraTecladoBotao}>Concluído</Text>
+            </TouchableOpacity>
+          </View>
+        </InputAccessoryView>
+      )}
 
       <TouchableOpacity
         style={[styles.botao, enviando && styles.botaoDesabilitado]}
@@ -322,8 +397,10 @@ interface CampoProps {
   onAlterar: (valor: string) => void;
   erro?: string;
   placeholder?: string;
-  teclado?: "default" | "email-address" | "phone-pad" | "numeric";
-  autoCapitalizar?: "none" | "sentences" | "words";
+  teclado?: "default" | "email-address" | "phone-pad" | "numeric" | "numbers-and-punctuation";
+  autoCapitalizar?: "none" | "sentences" | "words" | "characters";
+  refInput?: React.Ref<TextInput>;
+  senha?: boolean;
 }
 
 function Campo({
@@ -334,18 +411,27 @@ function Campo({
   placeholder,
   teclado = "default",
   autoCapitalizar = "sentences",
+  senha = false,
+  refInput,
 }: CampoProps) {
   return (
     <View style={styles.campoContainer}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
+        ref={refInput}
         style={[styles.input, erro ? styles.inputErro : null]}
         value={valor}
         onChangeText={onAlterar}
         placeholder={placeholder}
         placeholderTextColor="#999"
         keyboardType={teclado}
-        autoCapitalize={autoCapitalizar}
+        autoCapitalize={senha ? "none" : autoCapitalizar}
+        autoCorrect={!senha}
+        secureTextEntry={senha}
+        textContentType={senha ? "newPassword" : undefined}
+        inputAccessoryViewID={
+          Platform.OS === "ios" && TECLADOS_SEM_CONFIRMAR.includes(teclado) ? ID_BARRA_TECLADO : undefined
+        }
       />
       {erro ? <Text style={styles.textoErro}>{erro}</Text> : null}
     </View>
@@ -386,5 +472,15 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   botaoDesabilitado: { opacity: 0.6 },
+  barraTeclado: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    backgroundColor: "#F1F1F3",
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "#C7C7CC",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  barraTecladoBotao: { color: "#1E5B57", fontSize: 16, fontWeight: "700" },
   botaoTexto: { color: "#fff", fontSize: 16, fontWeight: "700" },
 });
