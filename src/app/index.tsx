@@ -38,7 +38,13 @@ const DIA_A_DIA: Acao[] = [
     descricao: 'Escolha um cliente e adicione janelas, portas e boxes com as medidas.',
     destino: '/projetos',
     disponivel: true,
-  }
+  },
+  {
+    titulo: 'Preços e margem',
+    descricao: 'Sua margem, mão de obra e perda de corte padrão.',
+    destino: '/configuracoes/precos',
+    disponivel: true,
+  },
 ];
 
 const CATALOGO: Acao[] = [

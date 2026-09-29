@@ -41,6 +41,7 @@ import {
 import { useAuth } from '@/auth/AuthContext';
 import { compartilharOrcamentoPdf } from '@/pdf/orcamentoPdf';
 import { COR } from '@/components/produtos/cores';
+import { AjustesOrcamento, ValoresAjuste } from '@/components/projetos/AjustesOrcamento';
 import { EditorPeca } from '@/components/projetos/EditorPeca';
 import { SeletorCliente } from '@/components/projetos/SeletorCliente';
 import { SeletorProduto } from '@/components/projetos/SeletorProduto';
@@ -120,6 +121,10 @@ export default function EditorProjeto() {
   const [alterado, setAlterado] = useState(false);
   const [compartilhando, setCompartilhando] = useState(false);
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
+  // Margem, mão de obra e custos ficam fora da vista: o orçamento pode ser
+  // montado na frente do cliente.
+  const [ajustesAbertos, setAjustesAbertos] = useState(false);
+  const [mostrarCustos, setMostrarCustos] = useState(false);
   const [ocupadoPedido, setOcupadoPedido] = useState<string | null>(null);
 
   // Com pedido no fornecedor, o projeto fica congelado (o servidor também bloqueia).
@@ -276,7 +281,7 @@ export default function EditorProjeto() {
   }
 
   function confirmarPedido() {
-    const valor = calculo ? ` no valor estimado de ${reais(calculo.custo_compra)}` : '';
+    const valor = calculo && mostrarCustos ? ` no valor estimado de ${reais(calculo.custo_compra)}` : '';
     Alert.alert(
       'Enviar pedido ao fornecedor',
       `A lista de compra deste projeto será enviada${valor}. Depois disso, o projeto não pode mais ser alterado.`,
@@ -411,7 +416,7 @@ export default function EditorProjeto() {
                       {p.itens.length} {p.itens.length === 1 ? 'item' : 'itens'}
                     </Text>
                   </View>
-                  <Text style={styles.resultadoValor}>{reais(p.total)}</Text>
+                  {mostrarCustos && <Text style={styles.resultadoValor}>{reais(p.total)}</Text>}
                 </View>
                 <Text style={[styles.pedidoStatus, p.status === 'erro' && { color: COR.erro }]}>
                   {p.status_texto}
@@ -479,30 +484,7 @@ export default function EditorProjeto() {
 
         {projeto.linhas.length > 0 && (
           <>
-            <View style={styles.linhaPerda}>
-              <Text style={styles.textoPerda}>Perda no corte dos perfis</Text>
-              <TextInput
-                style={styles.inputPerda}
-                value={projeto.perda_percentual}
-                onChangeText={(v) => alterar({ perda_percentual: v.replace(/[^0-9,.]/g, '').replace(',', '.') })}
-                keyboardType="decimal-pad"
-              />
-              <Text style={styles.textoPerda}>%</Text>
-            </View>
-
-            <Text style={styles.secao}>Preço para o cliente</Text>
-            <View style={styles.grade}>
-              <CampoValor rotulo="Margem sobre o material (%)" valor={projeto.margem_percentual}
-                onMudar={(v) => alterar({ margem_percentual: v })} />
-              <CampoValor rotulo="Validade (dias)" valor={projeto.validade_dias} inteiro
-                onMudar={(v) => alterar({ validade_dias: v })} />
-            </View>
-            <View style={styles.grade}>
-              <CampoValor rotulo="Mão de obra por m² (R$)" valor={projeto.mao_de_obra_m2}
-                onMudar={(v) => alterar({ mao_de_obra_m2: v })} />
-              <CampoValor rotulo="Mínimo por peça (R$)" valor={projeto.mao_de_obra_minima}
-                onMudar={(v) => alterar({ mao_de_obra_minima: v })} />
-            </View>
+            <Text style={styles.secao}>Condições do orçamento</Text>
             <View style={styles.grade}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.rotulo}>Valor adicional</Text>
@@ -520,7 +502,8 @@ export default function EditorProjeto() {
             <View style={styles.grade}>
               <CampoValor rotulo="Desconto (R$)" valor={projeto.desconto}
                 onMudar={(v) => alterar({ desconto: v })} />
-              <View style={{ flex: 1 }} />
+              <CampoValor rotulo="Validade (dias)" valor={projeto.validade_dias} inteiro
+                onMudar={(v) => alterar({ validade_dias: v })} />
             </View>
 
             <Text style={styles.rotulo}>Observações no orçamento</Text>
@@ -528,7 +511,7 @@ export default function EditorProjeto() {
               style={[styles.input, { minHeight: 70, textAlignVertical: 'top' }]}
               value={projeto.observacoes}
               onChangeText={(v) => alterar({ observacoes: v })}
-              placeholder="Ex: Pagamento 50% na aprovação e 50% na entrega. Prazo de 15 dias."
+              placeholder="Ex: Pagamento 50% na aprovação e 50% na entrega."
               placeholderTextColor={COR.tintaSuave}
               multiline
             />
@@ -537,15 +520,20 @@ export default function EditorProjeto() {
               {calculando ? (
                 <ActivityIndicator color={COR.borda} />
               ) : (
-                <Text style={styles.link}>Calcular preço e lista de compra</Text>
+                <Text style={styles.link}>Calcular preço</Text>
               )}
             </Pressable>
+            {!congelado && (
+              <Pressable style={styles.discreto} onPress={() => setAjustesAbertos(true)} hitSlop={8}>
+                <Text style={styles.discretoTexto}>Ajustes</Text>
+              </Pressable>
+            )}
           </>
         )}
 
         {calculo && (
           <>
-            <Text style={styles.secao}>O que o cliente vê</Text>
+            <Text style={styles.secao}>Orçamento</Text>
             <View style={styles.caixaResultado}>
               {calculo.linhas.map((l, i) => (
                 <View key={i} style={styles.resultadoLinha}>
@@ -578,6 +566,14 @@ export default function EditorProjeto() {
               </View>
             </View>
 
+            <Pressable style={styles.discreto} onPress={() => setMostrarCustos((v) => !v)} hitSlop={8}>
+              <Text style={styles.discretoTexto}>{mostrarCustos ? 'Ocultar custos' : 'Mostrar custos'}</Text>
+            </Pressable>
+          </>
+        )}
+
+        {calculo && mostrarCustos && (
+          <>
             <Text style={styles.secao}>Só para você</Text>
             <View style={styles.caixaResultado}>
               <LinhaInterna rotulo="Material (com perda de corte)" valor={calculo.orcamento.material_com_perda} />
@@ -656,6 +652,20 @@ export default function EditorProjeto() {
         onFechar={() => setSeletorCliente(false)}
       />
       <SeletorProduto visivel={seletorProduto} onSelecionar={produtoEscolhido} onFechar={() => setSeletorProduto(false)} />
+      <AjustesOrcamento
+        visivel={ajustesAbertos}
+        valores={{
+          margem_percentual: projeto.margem_percentual,
+          mao_de_obra_m2: projeto.mao_de_obra_m2,
+          mao_de_obra_minima: projeto.mao_de_obra_minima,
+          perda_percentual: projeto.perda_percentual,
+        }}
+        onSalvar={(v: ValoresAjuste) => {
+          alterar(v);
+          setAjustesAbertos(false);
+        }}
+        onFechar={() => setAjustesAbertos(false)}
+      />
       <EditorPeca
         peca={edicao?.peca ?? null}
         nova={edicao?.indice === null}
@@ -740,12 +750,8 @@ const styles = StyleSheet.create({
   quantidade: { color: COR.borda, fontSize: 17, fontWeight: '800' },
   adicionar: { padding: 16, alignItems: 'center' },
   link: { color: COR.borda, fontSize: 15, fontWeight: '700' },
-  linhaPerda: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 16, marginBottom: 12 },
-  textoPerda: { color: COR.tinta, fontSize: 15 },
-  inputPerda: {
-    backgroundColor: COR.superficie, borderWidth: 1, borderColor: COR.linha, borderRadius: 6,
-    paddingHorizontal: 10, paddingVertical: 8, fontSize: 16, color: COR.tinta, minWidth: 56, textAlign: 'center',
-  },
+  discreto: { alignSelf: 'flex-end', paddingVertical: 8, paddingHorizontal: 4 },
+  discretoTexto: { color: COR.tintaSuave, fontSize: 13 },
   botaoContorno: { borderWidth: 1.5, borderColor: COR.borda, borderRadius: 6, paddingVertical: 13, alignItems: 'center' },
   caixaResultado: { backgroundColor: COR.superficie, borderRadius: 10, borderWidth: 1, borderColor: COR.linha, padding: 14 },
   resultadoLinha: { flexDirection: 'row', alignItems: 'center', paddingVertical: 7, gap: 12 },

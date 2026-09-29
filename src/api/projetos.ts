@@ -192,8 +192,10 @@ export function pecaDoProduto(produto: Produto): Peca {
   };
 }
 
-export async function listarProjetos(): Promise<ProjetoResumo[]> {
-  return ler(await apiFetch('/projetos/'), 'Não foi possível carregar os projetos.');
+/** busca: nome do projeto, nº do orçamento, nome/empresa, celular ou CPF/CNPJ do cliente. */
+export async function listarProjetos(busca = ''): Promise<ProjetoResumo[]> {
+  const q = busca.trim() ? `?busca=${encodeURIComponent(busca.trim())}` : '';
+  return ler(await apiFetch(`/projetos/${q}`), 'Não foi possível carregar os projetos.');
 }
 
 export async function obterProjeto(id: string): Promise<Projeto> {
