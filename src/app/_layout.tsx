@@ -7,9 +7,10 @@
 // O AuthProvider envolve tudo, e o componente Navegacao aplica a proteção
 // de rotas: sem login, só as telas do grupo (auth) ficam acessíveis.
 
+import '@/util/alertaWeb';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useColorScheme } from 'react-native';
+import { Platform, useColorScheme, View } from 'react-native';
 
 import { AuthProvider, useProtecaoDeRotas } from '@/auth/AuthContext';
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
@@ -26,7 +27,9 @@ export default function RootLayout() {
     <AuthProvider>
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
         <AnimatedSplashOverlay />
-        <Navegacao />
+       <View style={Platform.OS === 'web' ? { flex: 1, width: '100%', maxWidth: 760, alignSelf: 'center' } : { flex: 1 }}>
+            <Navegacao />
+        </View>
       </ThemeProvider>
     </AuthProvider>
   );

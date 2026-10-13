@@ -15,6 +15,8 @@ export type ItemCatalogo = {
   preco: string;
   estoque: string | null;
   ativo: boolean;
+  imagem_url?: string | null; // enviada pela equipe no admin
+  miniatura_url?: string | null;
 };
 
 export type Fornecedor = { id: number; nome: string; slug: string };

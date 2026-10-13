@@ -1,4 +1,4 @@
-import * as SecureStore from "expo-secure-store";
+import * as SecureStore from "./cofre";
 
 // Defina EXPO_PUBLIC_API_URL no arquivo .env do app, por exemplo:
 // EXPO_PUBLIC_API_URL=http://IP_DA_VM:8000/api/v1

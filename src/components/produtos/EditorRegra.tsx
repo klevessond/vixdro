@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from 'react';
 import {
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -90,6 +91,9 @@ export function EditorRegra({ componente, onSalvar, onRemover, onFechar }: Props
     <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onFechar}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView style={styles.tela} contentContainerStyle={styles.conteudo} keyboardShouldPersistTaps="handled">
+          {!!item.imagem_url && (
+            <Image source={{ uri: item.imagem_url }} style={styles.imagem} resizeMode="contain" />
+          )}
           <Text style={styles.codigo}>{item.codigo}</Text>
           <Text style={styles.titulo}>{item.descricao}</Text>
           <Text style={styles.sub}>
@@ -195,6 +199,10 @@ function CampoNumero({
 const styles = StyleSheet.create({
   tela: { flex: 1, backgroundColor: COR.fundo },
   conteudo: { padding: 20, paddingBottom: 48 },
+  imagem: {
+    width: '100%', height: 180, borderRadius: 8, backgroundColor: COR.superficie,
+    borderWidth: 1, borderColor: COR.linha, marginBottom: 14,
+  },
   codigo: { color: COR.tintaSuave, fontSize: 13, fontWeight: '600' },
   titulo: { color: COR.tinta, fontSize: 20, fontWeight: '700', marginTop: 2 },
   sub: { color: COR.tintaSuave, fontSize: 14, marginTop: 4 },

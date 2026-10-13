@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   Modal,
   Pressable,
   StyleSheet,
@@ -129,6 +130,11 @@ export function SeletorItem({ visivel, onSelecionar, onFechar }: Props) {
                 style={({ pressed }) => [styles.item, pressed && { backgroundColor: COR.bordaClara }]}
                 accessibilityRole="button"
               >
+                {item.miniatura_url ? (
+                  <Image source={{ uri: item.miniatura_url }} style={styles.miniatura} resizeMode="contain" />
+                ) : (
+                  <View style={[styles.miniatura, styles.semImagem]} />
+                )}
                 <View style={{ flex: 1 }}>
                   <Text style={styles.itemDescricao}>{item.descricao}</Text>
                   <Text style={styles.itemCodigo}>
@@ -181,4 +187,6 @@ const styles = StyleSheet.create({
   itemDescricao: { color: COR.tinta, fontSize: 15, fontWeight: '600' },
   itemCodigo: { color: COR.tintaSuave, fontSize: 13, marginTop: 2 },
   itemPreco: { color: COR.tinta, fontSize: 15, fontWeight: '600' },
+  miniatura: { width: 48, height: 48, borderRadius: 6, backgroundColor: COR.bordaClara },
+  semImagem: { borderWidth: 1, borderColor: COR.linha, backgroundColor: COR.fundo },
 });
