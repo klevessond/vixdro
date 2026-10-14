@@ -28,7 +28,7 @@ const CAMPOS: Campo[] = [
   { chave: 'margem_padrao', rotulo: 'Margem sobre o material (%)', ajuda: 'Seu lucro sobre o custo dos itens.' },
   { chave: 'mao_de_obra_m2_padrao', rotulo: 'Mão de obra por m² (R$)', ajuda: 'Multiplicada pela área de cada peça.' },
   { chave: 'mao_de_obra_minima_padrao', rotulo: 'Mão de obra mínima por peça (R$)', ajuda: 'Para peças pequenas não saírem baratas demais.' },
-  { chave: 'perda_padrao', rotulo: 'Perda no corte dos perfis (%)', ajuda: 'Sobra estimada das barras. Entra no custo e na lista de compra.' },
+  { chave: 'perda_padrao', rotulo: 'Perda no corte dos perfis (%)', ajuda: 'Folga para calcular quantas barras comprar. Não entra no preço: o custo é pelo que é usado.' },
   { chave: 'validade_padrao', rotulo: 'Validade do orçamento (dias)', ajuda: 'Aparece no PDF como "Válido até".', inteiro: true },
 ];
 

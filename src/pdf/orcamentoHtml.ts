@@ -50,6 +50,13 @@ function endereco(e: { rua?: string; numero?: string; complemento?: string; bair
   return [linha1, linha2].filter((s) => s.trim()).join(' · ');
 }
 
+function medidas(largura: number, altura: number): string {
+  const t = largura && altura ? `${largura} × ${altura} mm`
+    : altura ? `altura ${altura} mm`
+    : largura ? `largura ${largura} mm` : '';
+  return t ? `<br><span class="suave">${t}</span>` : '';
+}
+
 function dataBR(d: Date) {
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
@@ -67,7 +74,7 @@ export function htmlOrcamento({ projeto, calculo, vidraceiro, cliente }: DadosOr
     .map(
       (l) => `
       <tr>
-        <td><strong>${esc(l.nome)}</strong><br><span class="suave">${l.largura_mm} × ${l.altura_mm} mm</span></td>
+        <td><strong>${esc(l.nome)}</strong>${medidas(l.largura_mm, l.altura_mm)}</td>
         <td class="centro">${l.quantidade}</td>
         <td class="direita">${reais(l.preco_unitario)}</td>
         <td class="direita">${reais(l.preco_total)}</td>

@@ -187,26 +187,48 @@ function fmt(n: number, casas = 2): string {
   return n.toLocaleString('pt-BR', { maximumFractionDigits: casas });
 }
 
-/** Resumo legível da regra, ex: "2×L + 2×A − 30 mm" ou "4 un". */
+const DISCRETAS = new Set(['UN', 'PC', 'PÇ', 'PAR', 'CX', 'JG', 'KIT', 'CJ']);
+
+/** Unidade em que o consumo é contado: "m" (perfis), "m²" (vidro) ou "un". */
+export function unidadeConsumo(item: ItemCatalogo): string {
+  const m = modoDoItem(item);
+  return m === 'area' ? 'm²' : m === 'unidade' ? 'un' : 'm';
+}
+
+/** Quantidade fixa (não depende da medida da peça)? */
+export function ehFixa(c: Componente): boolean {
+  return numero(c.coef_largura) === 0 && numero(c.coef_altura) === 0 && numero(c.coef_area) === 0;
+}
+
+/** Quanto do item vai em UMA peça com estas medidas (mesma conta do servidor). */
+export function consumoPorPeca(c: Componente, largura_mm: number, altura_mm: number): number {
+  const L = largura_mm / 1000;
+  const A = altura_mm / 1000;
+  let q = numero(c.coef_largura) * L + numero(c.coef_altura) * A + numero(c.coef_area) * L * A + numero(c.ajuste);
+  q = Math.max(0, q);
+  if (modoDoItem(c.item_detalhe) === 'unidade' && DISCRETAS.has(c.item_detalhe.unidade)) q = Math.ceil(q - 1e-9);
+  return q;
+}
+
+/** Resumo legível da regra, ex: "2 m por peça", "4 un por peça" ou "2× largura + 2× altura". */
 export function resumoRegra(c: Componente): string {
-  const modo = modoDoItem(c.item_detalhe);
+  const un = unidadeConsumo(c.item_detalhe);
+  if (ehFixa(c)) return `${fmt(numero(c.ajuste), 3)} ${un} por peça`;
+
   const partes: string[] = [];
   const cl = numero(c.coef_largura);
   const ca = numero(c.coef_altura);
   const car = numero(c.coef_area);
+  if (cl) partes.push(`${fmt(cl)}× largura`);
+  if (ca) partes.push(`${fmt(ca)}× altura`);
+  if (car) partes.push(`${fmt(car)}× área`);
+  let texto = partes.join(' + ');
   const aj = numero(c.ajuste);
-
-  if (cl) partes.push(`${fmt(cl)}×L`);
-  if (ca) partes.push(`${fmt(ca)}×A`);
-  if (car) partes.push(`${fmt(car)}×(L×A)`);
-
   if (aj) {
-    const usaMm = modo === 'peca_comprimento' || modo === 'metro';
-    const texto = usaMm ? `${fmt(Math.abs(aj) * 1000, 0)} mm` : `${fmt(Math.abs(aj), 3)} ${modo === 'area' ? 'm²' : 'un'}`;
-    if (partes.length === 0) partes.push(aj < 0 ? `−${texto}` : texto);
-    else partes.push(`${aj < 0 ? '−' : '+'} ${texto}`);
+    const ajusteTexto = un === 'm' ? `${fmt(Math.abs(aj) * 1000, 0)} mm` : `${fmt(Math.abs(aj), 3)} ${un}`;
+    texto += ` ${aj < 0 ? '−' : '+'} ${ajusteTexto}`;
   }
-  return partes.join(' + ').replace(/\+ ([+−])/g, '$1') || 'sem regra';
+  return texto;
 }
 
 /** Descrição curta de como o item é vendido, ex: "barra de 6 m" ou "por m²". */

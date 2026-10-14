@@ -10,9 +10,14 @@ import { COR } from '@/components/produtos/cores';
 
 const ROTULO = Object.fromEntries(CATEGORIAS.map((c) => [c.valor, c.rotulo]));
 
-type Props = { visivel: boolean; onSelecionar: (p: Produto) => void; onFechar: () => void };
+type Props = {
+  visivel: boolean;
+  onSelecionar: (p: Produto) => void;
+  onAvulsa: () => void;
+  onFechar: () => void;
+};
 
-export function SeletorProduto({ visivel, onSelecionar, onFechar }: Props) {
+export function SeletorProduto({ visivel, onSelecionar, onAvulsa, onFechar }: Props) {
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -36,6 +41,13 @@ export function SeletorProduto({ visivel, onSelecionar, onFechar }: Props) {
             <Text style={styles.link}>Fechar</Text>
           </Pressable>
         </View>
+        <Pressable
+          onPress={onAvulsa}
+          style={({ pressed }) => [styles.avulsa, pressed && { backgroundColor: COR.bordaClara }]}
+        >
+          <Text style={styles.avulsaTitulo}>+ Peça avulsa, sem modelo</Text>
+          <Text style={styles.detalhe}>Um perfil solto, acessórios extras, um vidro...</Text>
+        </Pressable>
         {carregando && <ActivityIndicator style={{ marginTop: 24 }} color={COR.borda} />}
         {erro && <Text style={styles.erro}>{erro}</Text>}
         <FlatList
@@ -71,6 +83,11 @@ const styles = StyleSheet.create({
   link: { color: COR.borda, fontSize: 16, fontWeight: '600' },
   divisor: { height: 1, backgroundColor: COR.linha, marginLeft: 20 },
   linha: { paddingHorizontal: 20, paddingVertical: 14 },
+  avulsa: {
+    marginHorizontal: 20, marginBottom: 12, padding: 14, borderRadius: 8,
+    borderWidth: 1, borderColor: COR.borda, borderStyle: 'dashed', backgroundColor: COR.superficie,
+  },
+  avulsaTitulo: { color: COR.borda, fontSize: 16, fontWeight: '700' },
   nome: { color: COR.tinta, fontSize: 16, fontWeight: '600' },
   detalhe: { color: COR.tintaSuave, fontSize: 14, marginTop: 2 },
   erro: { color: COR.erro, fontSize: 14, margin: 20 },

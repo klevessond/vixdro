@@ -69,13 +69,23 @@ interface CadastroClienteFormProps {
   camposExtras?: React.ReactNode;
   // Mostra os campos de senha e confirmação (usado na criação de conta).
   comSenha?: boolean;
+  // CPF/CNPJ obrigatório? Na conta do vidraceiro sim (vai no orçamento e no
+  // pedido ao fornecedor); no cadastro de um cliente, é opcional.
+  cpfObrigatorio?: boolean;
+  // E-mail obrigatório? Na conta do vidraceiro sim (é o login); no
+  // cadastro de um cliente, é opcional.
+  emailObrigatorio?: boolean;
 }
+
+const SENHA_MINIMA = 6;
 
 export function CadastroClienteForm({
   onSubmeter,
   textoBotao = "Cadastrar",
   camposExtras,
   comSenha = false,
+  cpfObrigatorio = true,
+  emailObrigatorio = true,
 }: CadastroClienteFormProps) {
   const [dados, setDados] = useState<DadosCliente>(DADOS_INICIAIS);
   const [erros, setErros] = useState<Erros>({});
@@ -166,7 +176,7 @@ export function CadastroClienteForm({
 
     if (!dados.nome.trim()) novosErros.nome = "Informe o nome";
     if (!dados.email.trim()) {
-      novosErros.email = "Informe o e-mail";
+      if (emailObrigatorio) novosErros.email = "Informe o e-mail";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dados.email)) {
       novosErros.email = "E-mail inválido";
     }
@@ -174,8 +184,10 @@ export function CadastroClienteForm({
       novosErros.celular = "Celular inválido";
     }
     const cpfCnpjNumeros = dados.cpfCnpj.replace(/\D/g, "");
-    if (cpfCnpjNumeros.length !== 11 && cpfCnpjNumeros.length !== 14) {
-      novosErros.cpfCnpj = "CPF ou CNPJ inválido";
+    const cpfVazio = cpfCnpjNumeros.length === 0;
+    // Opcional pode ficar vazio, mas se for preenchido precisa estar completo.
+    if (!(cpfVazio && !cpfObrigatorio) && cpfCnpjNumeros.length !== 11 && cpfCnpjNumeros.length !== 14) {
+      novosErros.cpfCnpj = cpfVazio ? "Informe o CPF ou CNPJ" : "CPF ou CNPJ incompleto";
     }
     if (dados.cep.replace(/\D/g, "").length !== 8) novosErros.cep = "CEP inválido";
     if (!dados.rua.trim()) novosErros.rua = "Informe a rua";
@@ -186,10 +198,8 @@ export function CadastroClienteForm({
 
     const novosErrosSenha: { senha?: string; confirmar?: string } = {};
     if (comSenha) {
-      if (senha.length < 8) {
-        novosErrosSenha.senha = "A senha precisa ter pelo menos 8 caracteres";
-      } else if (/^\d+$/.test(senha)) {
-        novosErrosSenha.senha = "Use letras além de números";
+      if (senha.length < SENHA_MINIMA) {
+        novosErrosSenha.senha = `A senha precisa ter pelo menos ${SENHA_MINIMA} caracteres`;
       }
       if (confirmarSenha !== senha) {
         novosErrosSenha.confirmar = "As senhas não são iguais";
@@ -237,7 +247,7 @@ export function CadastroClienteForm({
         placeholder="Opcional, se for pessoa física"
       />
       <Campo
-        label="E-mail"
+        label={emailObrigatorio ? "E-mail" : "E-mail (opcional)"}
         valor={dados.email}
         onAlterar={(v) => atualizarCampo("email", v)}
         erro={erros.email}
@@ -254,7 +264,7 @@ export function CadastroClienteForm({
         teclado="phone-pad"
       />
       <Campo
-        label="CPF ou CNPJ"
+        label={cpfObrigatorio ? "CPF ou CNPJ" : "CPF ou CNPJ (opcional)"}
         valor={dados.cpfCnpj}
         onAlterar={(v) => atualizarCampo("cpfCnpj", formatarCpfCnpj(v))}
         erro={erros.cpfCnpj}
@@ -346,7 +356,7 @@ export function CadastroClienteForm({
               if (errosSenha.senha) setErrosSenha((p) => ({ ...p, senha: undefined }));
             }}
             erro={errosSenha.senha}
-            placeholder="Pelo menos 8 caracteres"
+            placeholder={`Pelo menos ${SENHA_MINIMA} caracteres`}
             senha
           />
           <Campo

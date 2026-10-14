@@ -17,7 +17,15 @@ import {
   View,
 } from 'react-native';
 
-import { Componente, ItemCatalogo, modoDoItem, resumoRegra } from '@/api/produtos';
+import {
+  Componente,
+  ItemCatalogo,
+  consumoPorPeca,
+  modoDoItem,
+  numero,
+  resumoRegra,
+  unidadeConsumo,
+} from '@/api/produtos';
 import { Peca } from '@/api/projetos';
 import { EditorRegra } from '@/components/produtos/EditorRegra';
 import { SeletorItem } from '@/components/produtos/SeletorItem';
@@ -56,6 +64,19 @@ export function EditorPeca({ peca, nova, onSalvar, onRemover, onFechar }: Props)
 
   if (!peca) return null;
 
+  const L = parseInt(largura, 10) || 0;
+  const A = parseInt(altura, 10) || 0;
+  const Q = parseInt(quantidade, 10) || 1;
+
+  /** "8 m no total" (ou vazio, se falta a medida que o item usa). */
+  function totalDoItem(c: Componente): string {
+    const usaL = numero(c.coef_largura) !== 0 || numero(c.coef_area) !== 0;
+    const usaA = numero(c.coef_altura) !== 0 || numero(c.coef_area) !== 0;
+    if ((usaL && !L) || (usaA && !A)) return 'falta medida';
+    const total = consumoPorPeca(c, L, A) * Q;
+    return `${total.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} ${unidadeConsumo(c.item_detalhe)}`;
+  }
+
   function itemEscolhido(item: ItemCatalogo) {
     setSeletorAberto(false);
     const componente: Componente = {
@@ -63,8 +84,9 @@ export function EditorPeca({ peca, nova, onSalvar, onRemover, onFechar }: Props)
       item_detalhe: item,
       coef_largura: '0',
       coef_altura: '0',
+      // Vidro começa como "1 vez a área"; o resto, como quantidade fixa a preencher.
       coef_area: modoDoItem(item) === 'area' ? '1' : '0',
-      ajuste: modoDoItem(item) === 'unidade' ? '1' : '0',
+      ajuste: '0',
       observacao: '',
     };
     setTimeout(() => setEdicao({ indice: null, componente }), ESPERA_MODAL);
@@ -88,13 +110,23 @@ export function EditorPeca({ peca, nova, onSalvar, onRemover, onFechar }: Props)
   }
 
   function confirmar() {
-    const L = parseInt(largura, 10);
-    const A = parseInt(altura, 10);
+    const L = parseInt(largura, 10) || 0;
+    const A = parseInt(altura, 10) || 0;
     const Q = parseInt(quantidade, 10);
     if (!nome.trim()) return Alert.alert('Falta o nome', 'Ex: Janela da sala.');
-    if (!L || !A) return Alert.alert('Medidas', 'Informe a largura e a altura em milímetros.');
     if (!Q || Q < 1) return Alert.alert('Quantidade', 'A quantidade precisa ser pelo menos 1.');
     if (!itens.length) return Alert.alert('Nenhum item', 'A peça precisa ter pelo menos um item.');
+
+    // As medidas são opcionais, mas não quando algum item depende delas:
+    // sem isso, o custo sairia errado sem ninguém perceber.
+    const usaLargura = itens.find((c) => numero(c.coef_largura) !== 0 || numero(c.coef_area) !== 0);
+    const usaAltura = itens.find((c) => numero(c.coef_altura) !== 0 || numero(c.coef_area) !== 0);
+    if (usaLargura && !L) {
+      return Alert.alert('Falta a largura', `O item "${usaLargura.item_detalhe.descricao}" usa a largura no cálculo.`);
+    }
+    if (usaAltura && !A) {
+      return Alert.alert('Falta a altura', `O item "${usaAltura.item_detalhe.descricao}" usa a altura no cálculo.`);
+    }
     onSalvar({ ...peca!, nome: nome.trim(), largura_mm: L, altura_mm: A, quantidade: Q, itens });
   }
 
@@ -133,9 +165,9 @@ export function EditorPeca({ peca, nova, onSalvar, onRemover, onFechar }: Props)
                 value={largura}
                 onChangeText={(v) => setLargura(v.replace(/\D/g, ''))}
                 keyboardType="number-pad"
-                placeholder="1200"
+                placeholder="opcional"
                 placeholderTextColor={COR.tintaSuave}
-                autoFocus={nova}
+                autoFocus={nova && itens.length > 0}
               />
             </View>
             <View style={{ flex: 1 }}>
@@ -145,7 +177,7 @@ export function EditorPeca({ peca, nova, onSalvar, onRemover, onFechar }: Props)
                 value={altura}
                 onChangeText={(v) => setAltura(v.replace(/\D/g, ''))}
                 keyboardType="number-pad"
-                placeholder="1000"
+                placeholder="opcional"
                 placeholderTextColor={COR.tintaSuave}
               />
             </View>
@@ -162,7 +194,9 @@ export function EditorPeca({ peca, nova, onSalvar, onRemover, onFechar }: Props)
 
           <Text style={styles.secao}>Itens desta peça</Text>
           <Text style={styles.ajuda}>
-            Vieram do modelo. Mudanças aqui valem só para esta peça.
+            {peca.produto
+              ? 'Vieram do modelo. Mudanças aqui valem só para esta peça.'
+              : 'Escolha no catálogo os itens desta peça.'}
           </Text>
           <View style={styles.caixa}>
             {itens.map((c, i) => (
@@ -179,8 +213,9 @@ export function EditorPeca({ peca, nova, onSalvar, onRemover, onFechar }: Props)
                       {c.observacao ? ` · ${c.observacao}` : ''}
                       {!c.item_detalhe.ativo ? ' · saiu de linha' : ''}
                     </Text>
+                    <Text style={styles.regra}>{resumoRegra(c)}</Text>
                   </View>
-                  <Text style={styles.regra}>{resumoRegra(c)}</Text>
+                  <Text style={styles.total}>{totalDoItem(c)}</Text>
                 </Pressable>
               </View>
             ))}
@@ -206,6 +241,7 @@ export function EditorPeca({ peca, nova, onSalvar, onRemover, onFechar }: Props)
         <SeletorItem visivel={seletorAberto} onSelecionar={itemEscolhido} onFechar={() => setSeletorAberto(false)} />
         <EditorRegra
           componente={edicao?.componente ?? null}
+          contexto={{ largura_mm: L, altura_mm: A, quantidade: Q }}
           onSalvar={regraConfirmada}
           onRemover={edicao && edicao.indice !== null ? removerItem : undefined}
           onFechar={() => setEdicao(null)}
@@ -234,7 +270,8 @@ const styles = StyleSheet.create({
   item: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   itemNome: { color: COR.tinta, fontSize: 15, fontWeight: '600' },
   itemDetalhe: { color: COR.tintaSuave, fontSize: 13, marginTop: 2 },
-  regra: { color: COR.borda, fontSize: 14, fontWeight: '700', maxWidth: '45%', textAlign: 'right' },
+  regra: { color: COR.borda, fontSize: 13, fontWeight: '600', marginTop: 3 },
+  total: { color: COR.tinta, fontSize: 15, fontWeight: '800', textAlign: 'right' },
   adicionar: { padding: 16, alignItems: 'center' },
   botao: { backgroundColor: COR.borda, borderRadius: 6, paddingVertical: 15, alignItems: 'center', marginTop: 24 },
   botaoTexto: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },

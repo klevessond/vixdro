@@ -1,7 +1,11 @@
 // src/components/produtos/EditorRegra.tsx
 //
-// Define quanto de um item o produto consome, em função da largura (L)
-// e da altura (A). Mostra um exemplo ao vivo para o vidraceiro conferir.
+// Quanto de um item vai em cada peça. Duas formas, do jeito que o
+// vidraceiro pensa:
+//   - Quantidade fixa: "2 metros por peça", "4 unidades por peça".
+//   - Pela medida: "2 vezes a largura" (o consumo acompanha o tamanho).
+// Embaixo, a conta com os números reais: total usado, barras a comprar e
+// o custo considerado (sempre pelo que é usado, não pela barra inteira).
 
 import { useEffect, useState } from 'react';
 import {
@@ -17,75 +21,113 @@ import {
   View,
 } from 'react-native';
 
-import { Componente, comoEVendido, modoDoItem, numero, reais } from '@/api/produtos';
+import {
+  Componente,
+  comoEVendido,
+  consumoPorPeca,
+  ehFixa,
+  modoDoItem,
+  numero,
+  reais,
+  unidadeConsumo,
+} from '@/api/produtos';
 
 import { COR } from './cores';
 
+/** Medidas e quantidade da peça onde o item está (para a conta real). */
+export type ContextoPeca = { largura_mm: number; altura_mm: number; quantidade: number };
+
 type Props = {
   componente: Componente | null;
+  contexto?: ContextoPeca;
   onSalvar: (c: Componente) => void;
   onRemover?: () => void;
   onFechar: () => void;
 };
 
-const MEDIDA_EXEMPLO = 1000; // mm
-const DISCRETAS = new Set(['UN', 'PC', 'PÇ', 'PAR', 'CX', 'JG', 'KIT', 'CJ']);
+type Forma = 'fixa' | 'medida';
 
-function texto(n: number): string {
-  return n === 0 ? '' : String(n).replace('.', ',');
+function fmt(n: number, casas = 2) {
+  return n.toLocaleString('pt-BR', { maximumFractionDigits: casas });
 }
 
-export function EditorRegra({ componente, onSalvar, onRemover, onFechar }: Props) {
-  const [coefL, setCoefL] = useState('');
-  const [coefA, setCoefA] = useState('');
-  const [coefArea, setCoefArea] = useState('');
-  const [ajuste, setAjuste] = useState('');
+function texto(n: number): string {
+  return n === 0 ? '' : String(Number(n.toFixed(4))).replace('.', ',');
+}
+
+export function EditorRegra({ componente, contexto, onSalvar, onRemover, onFechar }: Props) {
+  const [forma, setForma] = useState<Forma>('fixa');
+  const [fixa, setFixa] = useState('');
+  const [vezesL, setVezesL] = useState('');
+  const [vezesA, setVezesA] = useState('');
+  const [vezesArea, setVezesArea] = useState('');
+  const [ajusteMm, setAjusteMm] = useState('');
   const [observacao, setObservacao] = useState('');
   const [erro, setErro] = useState<string | null>(null);
 
   const item = componente?.item_detalhe;
   const modo = item ? modoDoItem(item) : 'unidade';
-  // Para perfis e itens por metro, o ajuste é digitado em mm (mais natural
-  // para o vidraceiro) e guardado em metros.
-  const ajusteEmMm = modo === 'peca_comprimento' || modo === 'metro';
+  const linear = modo === 'peca_comprimento' || modo === 'metro';
 
   useEffect(() => {
     if (!componente) return;
-    setCoefL(texto(numero(componente.coef_largura)));
-    setCoefA(texto(numero(componente.coef_altura)));
-    setCoefArea(texto(numero(componente.coef_area)));
+    const f = ehFixa(componente);
+    setForma(f ? 'fixa' : 'medida');
+    setFixa(f ? texto(numero(componente.ajuste)) : '');
+    setVezesL(texto(numero(componente.coef_largura)));
+    setVezesA(texto(numero(componente.coef_altura)));
+    setVezesArea(texto(numero(componente.coef_area)));
     const aj = numero(componente.ajuste);
-    setAjuste(texto(ajusteEmMm ? Math.round(aj * 1000) : aj));
+    setAjusteMm(f ? '' : texto(linear ? Math.round(aj * 1000) : aj));
     setObservacao(componente.observacao);
     setErro(null);
-  }, [componente, ajusteEmMm]);
+  }, [componente]);
 
   if (!componente || !item) return null;
 
-  const ajusteReal = ajusteEmMm ? numero(ajuste) / 1000 : numero(ajuste);
-  const L = MEDIDA_EXEMPLO / 1000;
-  const A = MEDIDA_EXEMPLO / 1000;
-  let consumo = Math.max(0, numero(coefL) * L + numero(coefA) * A + numero(coefArea) * L * A + ajusteReal);
-  // Mesma regra do servidor: só arredonda para cima o que é vendido em peças inteiras.
-  if (modo === 'unidade' && DISCRETAS.has(item.unidade)) consumo = Math.ceil(consumo - 1e-9);
-  const pecas = modo === 'peca_comprimento' ? consumo / ((item.comprimento_mm ?? 1) / 1000) : null;
-  const custo = (pecas ?? consumo) * numero(item.preco);
-  const unidadeConsumo = modo === 'area' ? 'm²' : modo === 'unidade' ? 'un' : 'm';
+  const un = unidadeConsumo(item);
+  const nomeUnidade = un === 'm' ? 'metros' : un === 'm²' ? 'm²' : 'unidades';
+
+  // Monta o componente com o que está digitado agora (para a conta e para salvar).
+  function montar(): Componente {
+    if (forma === 'fixa') {
+      return { ...componente!, coef_largura: '0', coef_altura: '0', coef_area: '0', ajuste: String(numero(fixa)) };
+    }
+    const aj = linear ? numero(ajusteMm) / 1000 : numero(ajusteMm);
+    return {
+      ...componente!,
+      coef_largura: String(numero(vezesL)),
+      coef_altura: String(numero(vezesA)),
+      coef_area: String(numero(vezesArea)),
+      ajuste: String(Number(aj.toFixed(4))),
+    };
+  }
 
   function salvar() {
-    if ([coefL, coefA, coefArea, ajuste].every((v) => numero(v) === 0)) {
-      setErro('Preencha pelo menos um campo da regra.');
+    if (forma === 'fixa' && numero(fixa) <= 0) {
+      setErro(`Informe quantos ${nomeUnidade} vão em cada peça.`);
       return;
     }
-    onSalvar({
-      ...componente!,
-      coef_largura: String(numero(coefL)),
-      coef_altura: String(numero(coefA)),
-      coef_area: String(numero(coefArea)),
-      ajuste: String(Number(ajusteReal.toFixed(4))),
-      observacao: observacao.trim(),
-    });
+    if (forma === 'medida' && [vezesL, vezesA, vezesArea].every((v) => numero(v) === 0)) {
+      setErro('Informe quantas vezes a largura ou a altura este item usa.');
+      return;
+    }
+    onSalvar({ ...montar(), observacao: observacao.trim() });
   }
+
+  // ---- A conta, com os números da peça (ou um exemplo de 1 × 1 m) ----
+  const ctx = contexto ?? { largura_mm: 1000, altura_mm: 1000, quantidade: 1 };
+  const atual = montar();
+  const usaL = numero(atual.coef_largura) !== 0 || numero(atual.coef_area) !== 0;
+  const usaA = numero(atual.coef_altura) !== 0 || numero(atual.coef_area) !== 0;
+  const faltaMedida = (usaL && !ctx.largura_mm) || (usaA && !ctx.altura_mm);
+  const porPeca = consumoPorPeca(atual, ctx.largura_mm, ctx.altura_mm);
+  const total = porPeca * ctx.quantidade;
+  const comprimentoM = (item.comprimento_mm ?? 0) / 1000;
+  const barras = modo === 'peca_comprimento' && comprimentoM ? Math.ceil(total / comprimentoM - 1e-9) : null;
+  const custo = modo === 'peca_comprimento' && comprimentoM
+    ? (total / comprimentoM) * numero(item.preco)
+    : total * numero(item.preco);
 
   return (
     <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onFechar}>
@@ -98,36 +140,94 @@ export function EditorRegra({ componente, onSalvar, onRemover, onFechar }: Props
           <Text style={styles.titulo}>{item.descricao}</Text>
           <Text style={styles.sub}>
             {reais(item.preco)} {comoEVendido(item)}
+            {modo === 'peca_comprimento' && comprimentoM ? ` (${reais(numero(item.preco) / comprimentoM)} o metro)` : ''}
           </Text>
 
-          <Text style={styles.secao}>Quanto este produto consome</Text>
-          <Text style={styles.ajuda}>
-            {modo === 'unidade'
-              ? 'Para acessórios, normalmente basta a quantidade fixa (ex: 4 roldanas).'
-              : modo === 'area'
-                ? 'Para vidros, use "vezes a área": 1 significa uma chapa do tamanho do vão.'
-                : 'Em metros. Ex: um batente usa 2 vezes a largura e 2 vezes a altura.'}
-          </Text>
-
-          <View style={styles.linha}>
-            <CampoNumero rotulo="Vezes a largura" valor={coefL} onMudar={setCoefL} />
-            <CampoNumero rotulo="Vezes a altura" valor={coefA} onMudar={setCoefA} />
+          <Text style={styles.pergunta}>Quanto deste item vai em cada peça?</Text>
+          <View style={styles.abas}>
+            {(['fixa', 'medida'] as Forma[]).map((f) => (
+              <Pressable
+                key={f}
+                onPress={() => {
+                  setForma(f);
+                  setErro(null);
+                }}
+                style={[styles.aba, forma === f && styles.abaAtiva]}
+              >
+                <Text style={[styles.abaTexto, forma === f && styles.abaTextoAtiva]}>
+                  {f === 'fixa' ? 'Quantidade fixa' : 'Pela medida da peça'}
+                </Text>
+              </Pressable>
+            ))}
           </View>
-          {(modo === 'area' || numero(coefArea) !== 0) && (
-            <CampoNumero rotulo="Vezes a área (L × A)" valor={coefArea} onMudar={setCoefArea} />
+
+          {forma === 'fixa' ? (
+            <>
+              <Text style={styles.rotulo}>{nomeUnidade[0].toUpperCase() + nomeUnidade.slice(1)} por peça</Text>
+              <TextInput
+                style={styles.input}
+                value={fixa}
+                onChangeText={(v) => setFixa(v.replace(/[^0-9,.]/g, ''))}
+                keyboardType="decimal-pad"
+                placeholder={un === 'un' ? 'Ex: 4' : 'Ex: 2'}
+                placeholderTextColor={COR.tintaSuave}
+                autoFocus
+              />
+              <Text style={styles.ajuda}>
+                {un === 'm'
+                  ? 'Ex: 2 metros por janela. Para 4 janelas, o total vira 8 metros.'
+                  : un === 'un'
+                    ? 'Ex: 4 roldanas por janela.'
+                    : 'Ex: 1,5 m² de vidro por peça.'}
+              </Text>
+            </>
+          ) : (
+            <>
+              <View style={styles.linha}>
+                <CampoNumero rotulo="Vezes a largura" valor={vezesL} onMudar={setVezesL} />
+                <CampoNumero rotulo="Vezes a altura" valor={vezesA} onMudar={setVezesA} />
+              </View>
+              {(modo === 'area' || numero(vezesArea) !== 0) && (
+                <CampoNumero rotulo="Vezes a área (largura × altura)" valor={vezesArea} onMudar={setVezesArea} />
+              )}
+              <Text style={styles.ajuda}>
+                Ex: uma travessa em cima e outra embaixo usa 2 vezes a largura.
+              </Text>
+              <CampoNumero
+                rotulo={linear ? 'Desconto ou acréscimo em mm (opcional)' : `Somar ${un} (opcional)`}
+                valor={ajusteMm}
+                onMudar={setAjusteMm}
+                permiteNegativo
+              />
+            </>
           )}
-          <CampoNumero
-            rotulo={
-              modo === 'unidade'
-                ? 'Quantidade fixa'
-                : ajusteEmMm
-                  ? 'Ajuste em mm (negativo desconta)'
-                  : 'Ajuste em m²'
-            }
-            valor={ajuste}
-            onMudar={setAjuste}
-            permiteNegativo
-          />
+
+          <View style={styles.conta}>
+            <Text style={styles.contaTitulo}>
+              {contexto
+                ? `Nesta peça${contexto.largura_mm || contexto.altura_mm ? ` (${[contexto.largura_mm, contexto.altura_mm].filter(Boolean).join(' × ')} mm)` : ''}, ${ctx.quantidade} ${ctx.quantidade === 1 ? 'unidade' : 'unidades'}`
+                : 'Exemplo com uma peça de 1 × 1 metro'}
+            </Text>
+            {faltaMedida ? (
+              <Text style={styles.contaLinha}>Informe a medida da peça para ver a conta.</Text>
+            ) : (
+              <>
+                <Text style={styles.contaLinha}>
+                  {fmt(porPeca, 3)} {un} por peça
+                  {ctx.quantidade > 1 ? ` × ${ctx.quantidade} = ${fmt(total, 3)} ${un}` : ''}
+                </Text>
+                {barras !== null && total > 0 && (
+                  <Text style={styles.contaLinha}>
+                    Comprar {barras} {barras === 1 ? 'barra' : 'barras'} de {fmt(comprimentoM)} m
+                    {barras * comprimentoM - total > 0.0005 ? ` (sobram ${fmt(barras * comprimentoM - total)} m)` : ''}
+                  </Text>
+                )}
+                <Text style={styles.contaCusto}>
+                  Custo considerado: {fmt(total, 3)} {un} = {reais(custo)}
+                </Text>
+              </>
+            )}
+          </View>
 
           <Text style={styles.rotulo}>Observação</Text>
           <TextInput
@@ -139,18 +239,6 @@ export function EditorRegra({ componente, onSalvar, onRemover, onFechar }: Props
             maxLength={100}
           />
 
-          <View style={styles.exemplo}>
-            <Text style={styles.exemploTitulo}>
-              Numa medida de {MEDIDA_EXEMPLO} × {MEDIDA_EXEMPLO} mm
-            </Text>
-            <Text style={styles.exemploValor}>
-              {consumo.toLocaleString('pt-BR', { maximumFractionDigits: 3 })} {unidadeConsumo}
-              {pecas !== null &&
-                ` (${pecas.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} de peça)`}
-            </Text>
-            <Text style={styles.exemploCusto}>{reais(custo)} de material</Text>
-          </View>
-
           {erro && <Text style={styles.erro}>{erro}</Text>}
 
           <Pressable style={styles.botao} onPress={salvar} accessibilityRole="button">
@@ -161,7 +249,7 @@ export function EditorRegra({ componente, onSalvar, onRemover, onFechar }: Props
           </Pressable>
           {onRemover && (
             <Pressable style={styles.botaoSecundario} onPress={onRemover} accessibilityRole="button">
-              <Text style={[styles.botaoSecundarioTexto, { color: COR.erro }]}>Remover do produto</Text>
+              <Text style={[styles.botaoSecundarioTexto, { color: COR.erro }]}>Remover este item</Text>
             </Pressable>
           )}
         </ScrollView>
@@ -200,45 +288,35 @@ const styles = StyleSheet.create({
   tela: { flex: 1, backgroundColor: COR.fundo },
   conteudo: { padding: 20, paddingBottom: 48 },
   imagem: {
-    width: '100%', height: 180, borderRadius: 8, backgroundColor: COR.superficie,
+    width: '100%', height: 160, borderRadius: 8, backgroundColor: COR.superficie,
     borderWidth: 1, borderColor: COR.linha, marginBottom: 14,
   },
   codigo: { color: COR.tintaSuave, fontSize: 13, fontWeight: '600' },
-  titulo: { color: COR.tinta, fontSize: 20, fontWeight: '700', marginTop: 2 },
+  titulo: { color: COR.tinta, fontSize: 19, fontWeight: '700', marginTop: 2 },
   sub: { color: COR.tintaSuave, fontSize: 14, marginTop: 4 },
-  secao: { color: COR.tinta, fontSize: 16, fontWeight: '700', marginTop: 24 },
-  ajuda: { color: COR.tintaSuave, fontSize: 14, lineHeight: 20, marginTop: 4, marginBottom: 12 },
+  pergunta: { color: COR.tinta, fontSize: 17, fontWeight: '700', marginTop: 22, marginBottom: 10 },
+  abas: { flexDirection: 'row', backgroundColor: COR.bordaClara, borderRadius: 8, padding: 3, marginBottom: 16 },
+  aba: { flex: 1, paddingVertical: 10, borderRadius: 6, alignItems: 'center' },
+  abaAtiva: { backgroundColor: COR.superficie },
+  abaTexto: { color: COR.tintaSuave, fontSize: 14, fontWeight: '600' },
+  abaTextoAtiva: { color: COR.borda },
   linha: { flexDirection: 'row', gap: 12 },
   campo: { flex: 1, marginBottom: 12 },
   rotulo: { color: COR.tinta, fontSize: 14, fontWeight: '600', marginBottom: 6 },
   input: {
-    backgroundColor: COR.superficie,
-    borderWidth: 1,
-    borderColor: COR.linha,
-    borderRadius: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 11,
-    fontSize: 16,
-    color: COR.tinta,
+    backgroundColor: COR.superficie, borderWidth: 1, borderColor: COR.linha, borderRadius: 6,
+    paddingHorizontal: 12, paddingVertical: 11, fontSize: 16, color: COR.tinta,
   },
-  exemplo: {
-    backgroundColor: COR.bordaClara,
-    borderLeftWidth: 3,
-    borderLeftColor: COR.borda,
-    padding: 14,
-    marginTop: 20,
+  ajuda: { color: COR.tintaSuave, fontSize: 13, lineHeight: 19, marginTop: 6, marginBottom: 12 },
+  conta: {
+    backgroundColor: COR.bordaClara, borderLeftWidth: 3, borderLeftColor: COR.borda,
+    padding: 14, marginTop: 8, marginBottom: 18,
   },
-  exemploTitulo: { color: COR.tintaSuave, fontSize: 13 },
-  exemploValor: { color: COR.tinta, fontSize: 18, fontWeight: '700', marginTop: 4 },
-  exemploCusto: { color: COR.tinta, fontSize: 14, marginTop: 2 },
-  erro: { color: COR.erro, fontSize: 14, marginTop: 12 },
-  botao: {
-    backgroundColor: COR.borda,
-    borderRadius: 6,
-    paddingVertical: 15,
-    alignItems: 'center',
-    marginTop: 20,
-  },
+  contaTitulo: { color: COR.tintaSuave, fontSize: 13, marginBottom: 6 },
+  contaLinha: { color: COR.tinta, fontSize: 16, fontWeight: '600', marginTop: 2 },
+  contaCusto: { color: COR.tinta, fontSize: 14, marginTop: 6 },
+  erro: { color: COR.erro, fontSize: 14, marginBottom: 8 },
+  botao: { backgroundColor: COR.borda, borderRadius: 6, paddingVertical: 15, alignItems: 'center', marginTop: 8 },
   botaoTexto: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
   botaoSecundario: { alignItems: 'center', paddingVertical: 14 },
   botaoSecundarioTexto: { color: COR.borda, fontSize: 15, fontWeight: '600' },

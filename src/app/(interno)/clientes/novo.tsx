@@ -29,7 +29,7 @@ export default function NovoCliente() {
     <KeyboardAvoidingView style={styles.tela} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Stack.Screen options={{ headerShown: true, title: 'Novo cliente' }} />
       <ScrollView keyboardShouldPersistTaps="handled">
-        <CadastroClienteForm onSubmeter={handleCadastrar} textoBotao="Salvar cliente" />
+        <CadastroClienteForm onSubmeter={handleCadastrar} textoBotao="Salvar cliente" cpfObrigatorio={false} emailObrigatorio={false} />
       </ScrollView>
     </KeyboardAvoidingView>
   );

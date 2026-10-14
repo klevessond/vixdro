@@ -179,6 +179,19 @@ export async function obterPadroes(): Promise<Precificacao & { perda_percentual:
   return ler(await apiFetch('/projetos/padroes/'), 'Não foi possível carregar os padrões.');
 }
 
+/** "1200 × 1000 mm", "altura 2100 mm", "largura 800 mm" ou "" (sem medidas). */
+export function medidasTexto(largura: number, altura: number): string {
+  if (largura && altura) return `${largura} × ${altura} mm`;
+  if (altura) return `altura ${altura} mm`;
+  if (largura) return `largura ${largura} mm`;
+  return '';
+}
+
+/** Peça sem modelo: o vidraceiro monta com itens avulsos do catálogo. */
+export function pecaAvulsa(): Peca {
+  return { produto: null, nome: '', largura_mm: 0, altura_mm: 0, quantidade: 1, observacao: '', itens: [] };
+}
+
 /** Cria a peça a partir de um modelo: copia os itens e as regras. */
 export function pecaDoProduto(produto: Produto): Peca {
   return {

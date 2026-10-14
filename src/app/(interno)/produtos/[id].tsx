@@ -83,7 +83,7 @@ export default function EditorProduto() {
       coef_largura: '0',
       coef_altura: '0',
       coef_area: modoDoItem(item) === 'area' ? '1' : '0',
-      ajuste: modoDoItem(item) === 'unidade' ? '1' : '0',
+      ajuste: '0',
       observacao: '',
     };
     setTimeout(() => setEdicao({ indice: null, componente }), ESPERA_MODAL);
@@ -104,12 +104,9 @@ export default function EditorProduto() {
   }
 
   async function calcular() {
+    // Medidas vazias contam como zero (ex: produto que só usa a altura).
     const L = Math.round(numero(largura));
     const A = Math.round(numero(altura));
-    if (!L || !A) {
-      Alert.alert('Medidas', 'Informe a largura e a altura em milímetros.');
-      return;
-    }
     setCalculando(true);
     try {
       setSimulacao(await simular(L, A, produto.componentes));
@@ -304,6 +301,7 @@ export default function EditorProduto() {
       <SeletorItem visivel={seletorAberto} onSelecionar={itemEscolhido} onFechar={() => setSeletorAberto(false)} />
       <EditorRegra
         componente={edicao?.componente ?? null}
+        contexto={{ largura_mm: Math.round(numero(largura)), altura_mm: Math.round(numero(altura)), quantidade: 1 }}
         onSalvar={regraConfirmada}
         onRemover={edicao?.indice !== null ? removerComponente : undefined}
         onFechar={() => setEdicao(null)}

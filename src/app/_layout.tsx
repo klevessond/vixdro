@@ -27,7 +27,7 @@ export default function RootLayout() {
     <AuthProvider>
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
         <AnimatedSplashOverlay />
-       <View style={Platform.OS === 'web' ? { flex: 1, width: '100%', maxWidth: 760, alignSelf: 'center' } : { flex: 1 }}>
+       <View style={Platform.OS === 'web' ? { flex: 1, width: '100%', maxWidth: 1200, alignSelf: 'center' } : { flex: 1 }}>
             <Navegacao />
         </View>
       </ThemeProvider>

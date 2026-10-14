@@ -33,6 +33,8 @@ import {
   Projeto,
   arquivarProjeto,
   calcularProjeto,
+  medidasTexto,
+  pecaAvulsa,
   obterPadroes,
   obterProjeto,
   pecaDoProduto,
@@ -166,6 +168,11 @@ export default function EditorProjeto() {
   function clienteEscolhido(c: ClienteLocal) {
     setSeletorCliente(false);
     alterar({ cliente: c.id, cliente_nome: c.nome });
+  }
+
+  function avulsaEscolhida() {
+    setSeletorProduto(false);
+    setTimeout(() => setEdicao({ indice: null, peca: pecaAvulsa() }), ESPERA_MODAL);
   }
 
   function produtoEscolhido(p: Produto) {
@@ -462,7 +469,9 @@ export default function EditorProjeto() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.pecaNome}>{p.nome}</Text>
                   <Text style={styles.pecaDetalhe}>
-                    {p.largura_mm} × {p.altura_mm} mm · {p.itens.length} {p.itens.length === 1 ? 'item' : 'itens'}
+                    {[medidasTexto(p.largura_mm, p.altura_mm), `${p.itens.length} ${p.itens.length === 1 ? 'item' : 'itens'}`]
+                      .filter(Boolean)
+                      .join(' · ')}
                   </Text>
                 </View>
                 <Text style={styles.quantidade}>{p.quantidade}×</Text>
@@ -540,7 +549,9 @@ export default function EditorProjeto() {
                   <View style={{ flex: 1 }}>
                     <Text style={styles.resultadoNome}>{l.nome}</Text>
                     <Text style={styles.resultadoDetalhe}>
-                      {l.largura_mm} × {l.altura_mm} mm · {l.quantidade} × {reais(l.preco_unitario)}
+                      {[medidasTexto(l.largura_mm, l.altura_mm), `${l.quantidade} × ${reais(l.preco_unitario)}`]
+                        .filter(Boolean)
+                        .join(' · ')}
                     </Text>
                   </View>
                   <Text style={styles.resultadoValor}>{reais(l.preco_total)}</Text>
@@ -576,7 +587,7 @@ export default function EditorProjeto() {
           <>
             <Text style={styles.secao}>Só para você</Text>
             <View style={styles.caixaResultado}>
-              <LinhaInterna rotulo="Material (com perda de corte)" valor={calculo.orcamento.material_com_perda} />
+              <LinhaInterna rotulo="Material (pelo que é usado)" valor={calculo.orcamento.material_com_perda} />
               <LinhaInterna rotulo="Seu lucro sobre o material" valor={calculo.orcamento.lucro_material} />
               <LinhaInterna rotulo="Mão de obra" valor={calculo.orcamento.mao_de_obra} />
               <LinhaInterna rotulo="Compra no fornecedor (barras inteiras)" valor={calculo.custo_compra} />
@@ -651,7 +662,12 @@ export default function EditorProjeto() {
         }}
         onFechar={() => setSeletorCliente(false)}
       />
-      <SeletorProduto visivel={seletorProduto} onSelecionar={produtoEscolhido} onFechar={() => setSeletorProduto(false)} />
+      <SeletorProduto
+        visivel={seletorProduto}
+        onSelecionar={produtoEscolhido}
+        onAvulsa={avulsaEscolhida}
+        onFechar={() => setSeletorProduto(false)}
+      />
       <AjustesOrcamento
         visivel={ajustesAbertos}
         valores={{
