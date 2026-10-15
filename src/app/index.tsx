@@ -54,6 +54,18 @@ const CATALOGO: Acao[] = [
     destino: '/produtos',
     disponivel: true,
   },
+       {
+       titulo: 'Meus itens',
+       descricao: 'Vidros e outros itens que não estão no catálogo do fornecedor.',
+       destino: '/configuracoes/meus-itens',
+       disponivel: true,
+     },
+     {
+       titulo: 'Minha empresa',
+       descricao: 'Logomarca que aparece nos orçamentos.',
+       destino: '/configuracoes/empresa',
+       disponivel: true,
+     },
 ];
 
 function primeiroNome(nome?: string) {

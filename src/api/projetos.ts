@@ -179,11 +179,15 @@ export async function obterPadroes(): Promise<Precificacao & { perda_percentual:
   return ler(await apiFetch('/projetos/padroes/'), 'Não foi possível carregar os padrões.');
 }
 
-/** "1200 × 1000 mm", "altura 2100 mm", "largura 800 mm" ou "" (sem medidas). */
+function metros(mm: number): string {
+  return (mm / 1000).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 3 });
+}
+
+/** "1,20 × 1,00 m", "altura 2,10 m", "largura 0,80 m" ou "" (sem medidas). */
 export function medidasTexto(largura: number, altura: number): string {
-  if (largura && altura) return `${largura} × ${altura} mm`;
-  if (altura) return `altura ${altura} mm`;
-  if (largura) return `largura ${largura} mm`;
+  if (largura && altura) return `${metros(largura)} × ${metros(altura)} m`;
+  if (altura) return `altura ${metros(altura)} m`;
+  if (largura) return `largura ${metros(largura)} m`;
   return '';
 }
 

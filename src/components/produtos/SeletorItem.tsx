@@ -27,6 +27,7 @@ import {
 } from '@/api/produtos';
 
 import { COR } from './cores';
+import { EditorItemProprio } from './EditorItemProprio';
 
 type Props = {
   visivel: boolean;
@@ -42,6 +43,7 @@ export function SeletorItem({ visivel, onSelecionar, onFechar }: Props) {
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const ultimaBusca = useRef(0);
+  const [novoItemAberto, setNovoItemAberto] = useState(false);
 
   useEffect(() => {
     if (!visivel || fornecedores.length) return;
@@ -107,6 +109,10 @@ export function SeletorItem({ visivel, onSelecionar, onFechar }: Props) {
           clearButtonMode="while-editing"
         />
 
+        <Pressable onPress={() => setNovoItemAberto(true)} style={styles.novoItem} hitSlop={6}>
+          <Text style={styles.novoItemTexto}>+ Item que não está no catálogo (ex: vidro)</Text>
+        </Pressable>
+
         {erro && <Text style={styles.erro}>{erro}</Text>}
         {carregando && <ActivityIndicator style={{ marginTop: 16 }} color={COR.borda} />}
 
@@ -118,7 +124,9 @@ export function SeletorItem({ visivel, onSelecionar, onFechar }: Props) {
           ListEmptyComponent={
             !carregando && !erro ? (
               <Text style={styles.vazio}>
-                {busca.trim() ? 'Nenhum item encontrado.' : 'Digite para buscar no catálogo.'}
+                {busca.trim()
+                  ? 'Nenhum item encontrado. Se ele não existe no catálogo, cadastre como item próprio.'
+                  : 'Digite para buscar no catálogo.'}
               </Text>
             ) : null
           }
@@ -148,6 +156,17 @@ export function SeletorItem({ visivel, onSelecionar, onFechar }: Props) {
           }}
         />
       </View>
+
+      <EditorItemProprio
+        visivel={novoItemAberto}
+        nomeInicial={busca.trim()}
+        onSalvo={(item) => {
+          setNovoItemAberto(false);
+          setFornecedores([]); // recarrega: a aba "Meus itens" pode ter acabado de surgir
+          onSelecionar(item);
+        }}
+        onFechar={() => setNovoItemAberto(false)}
+      />
     </Modal>
   );
 }
@@ -181,6 +200,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   erro: { color: COR.erro, fontSize: 14, marginHorizontal: 20, marginTop: 8 },
+  novoItem: { marginHorizontal: 20, marginBottom: 6, paddingVertical: 6 },
+  novoItemTexto: { color: COR.borda, fontSize: 14, fontWeight: '600' },
   vazio: { color: COR.tintaSuave, fontSize: 15, textAlign: 'center', marginTop: 32 },
   divisor: { height: 1, backgroundColor: COR.linha, marginLeft: 20 },
   item: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, gap: 12 },

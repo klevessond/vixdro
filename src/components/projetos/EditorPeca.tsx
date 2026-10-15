@@ -21,7 +21,11 @@ import {
   Componente,
   ItemCatalogo,
   consumoPorPeca,
+  custoPorPeca,
+  metrosParaMm,
+  mmParaMetros,
   modoDoItem,
+  reais,
   numero,
   resumoRegra,
   unidadeConsumo,
@@ -56,17 +60,27 @@ export function EditorPeca({ peca, nova, onSalvar, onRemover, onFechar }: Props)
   useEffect(() => {
     if (!peca) return;
     setNome(peca.nome);
-    setLargura(peca.largura_mm ? String(peca.largura_mm) : '');
-    setAltura(peca.altura_mm ? String(peca.altura_mm) : '');
+    // As medidas são digitadas em metros ("1,20") e guardadas em mm (1200).
+    setLargura(mmParaMetros(peca.largura_mm));
+    setAltura(mmParaMetros(peca.altura_mm));
     setQuantidade(String(peca.quantidade || 1));
     setItens(peca.itens);
   }, [peca]);
 
   if (!peca) return null;
 
-  const L = parseInt(largura, 10) || 0;
-  const A = parseInt(altura, 10) || 0;
+  const L = metrosParaMm(largura);
+  const A = metrosParaMm(altura);
   const Q = parseInt(quantidade, 10) || 1;
+
+  function faltaMedida(c: Componente): boolean {
+    const usaL = numero(c.coef_largura) !== 0 || numero(c.coef_area) !== 0;
+    const usaA = numero(c.coef_altura) !== 0 || numero(c.coef_area) !== 0;
+    return (usaL && !L) || (usaA && !A);
+  }
+
+  // Custo do consumo de UMA peça (null se falta medida em algum item).
+  const custoDaPeca = itens.some(faltaMedida) ? null : itens.reduce((t, c) => t + custoPorPeca(c, L, A), 0);
 
   /** "8 m no total" (ou vazio, se falta a medida que o item usa). */
   function totalDoItem(c: Componente): string {
@@ -110,8 +124,8 @@ export function EditorPeca({ peca, nova, onSalvar, onRemover, onFechar }: Props)
   }
 
   function confirmar() {
-    const L = parseInt(largura, 10) || 0;
-    const A = parseInt(altura, 10) || 0;
+    const L = metrosParaMm(largura);
+    const A = metrosParaMm(altura);
     const Q = parseInt(quantidade, 10);
     if (!nome.trim()) return Alert.alert('Falta o nome', 'Ex: Janela da sala.');
     if (!Q || Q < 1) return Alert.alert('Quantidade', 'A quantidade precisa ser pelo menos 1.');
@@ -159,24 +173,24 @@ export function EditorPeca({ peca, nova, onSalvar, onRemover, onFechar }: Props)
 
           <View style={styles.linha}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.rotulo}>Largura (mm)</Text>
+              <Text style={styles.rotulo}>Largura (m)</Text>
               <TextInput
                 style={styles.input}
                 value={largura}
-                onChangeText={(v) => setLargura(v.replace(/\D/g, ''))}
-                keyboardType="number-pad"
+                onChangeText={(v) => setLargura(v.replace(/[^0-9,.]/g, ''))}
+                keyboardType="decimal-pad"
                 placeholder="opcional"
                 placeholderTextColor={COR.tintaSuave}
                 autoFocus={nova && itens.length > 0}
               />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.rotulo}>Altura (mm)</Text>
+              <Text style={styles.rotulo}>Altura (m)</Text>
               <TextInput
                 style={styles.input}
                 value={altura}
-                onChangeText={(v) => setAltura(v.replace(/\D/g, ''))}
-                keyboardType="number-pad"
+                onChangeText={(v) => setAltura(v.replace(/[^0-9,.]/g, ''))}
+                keyboardType="decimal-pad"
                 placeholder="opcional"
                 placeholderTextColor={COR.tintaSuave}
               />
@@ -215,7 +229,10 @@ export function EditorPeca({ peca, nova, onSalvar, onRemover, onFechar }: Props)
                     </Text>
                     <Text style={styles.regra}>{resumoRegra(c)}</Text>
                   </View>
-                  <Text style={styles.total}>{totalDoItem(c)}</Text>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={styles.total}>{totalDoItem(c)}</Text>
+                    {!faltaMedida(c) && <Text style={styles.custoItem}>{reais(custoPorPeca(c, L, A) * Q)}</Text>}
+                  </View>
                 </Pressable>
               </View>
             ))}
@@ -227,6 +244,28 @@ export function EditorPeca({ peca, nova, onSalvar, onRemover, onFechar }: Props)
               <Text style={styles.link}>+ Adicionar item</Text>
             </Pressable>
           </View>
+
+          {itens.length > 0 && (
+            <View style={styles.custo}>
+              {custoDaPeca === null ? (
+                <Text style={styles.custoTexto}>Informe as medidas para ver o custo dos itens.</Text>
+              ) : (
+                <>
+                  <View style={styles.custoLinha}>
+                    <Text style={styles.custoTexto}>Custo dos itens por peça</Text>
+                    <Text style={styles.custoValor}>{reais(custoDaPeca)}</Text>
+                  </View>
+                  {Q > 1 && (
+                    <View style={styles.custoLinha}>
+                      <Text style={styles.custoTexto}>Total ({Q} peças)</Text>
+                      <Text style={styles.custoTotal}>{reais(custoDaPeca * Q)}</Text>
+                    </View>
+                  )}
+                  <Text style={styles.custoNota}>Pelo que é usado, não pelas barras compradas.</Text>
+                </>
+              )}
+            </View>
+          )}
 
           <Pressable style={styles.botao} onPress={confirmar}>
             <Text style={styles.botaoTexto}>{nova ? 'Adicionar ao projeto' : 'Confirmar'}</Text>
@@ -272,6 +311,13 @@ const styles = StyleSheet.create({
   itemDetalhe: { color: COR.tintaSuave, fontSize: 13, marginTop: 2 },
   regra: { color: COR.borda, fontSize: 13, fontWeight: '600', marginTop: 3 },
   total: { color: COR.tinta, fontSize: 15, fontWeight: '800', textAlign: 'right' },
+  custoItem: { color: COR.tintaSuave, fontSize: 13, marginTop: 2 },
+  custo: { backgroundColor: COR.bordaClara, borderLeftWidth: 3, borderLeftColor: COR.borda, padding: 14, marginTop: 14 },
+  custoLinha: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 2 },
+  custoTexto: { color: COR.tinta, fontSize: 14 },
+  custoValor: { color: COR.tinta, fontSize: 16, fontWeight: '700' },
+  custoTotal: { color: COR.tinta, fontSize: 18, fontWeight: '800' },
+  custoNota: { color: COR.tintaSuave, fontSize: 12, marginTop: 6 },
   adicionar: { padding: 16, alignItems: 'center' },
   botao: { backgroundColor: COR.borda, borderRadius: 6, paddingVertical: 15, alignItems: 'center', marginTop: 24 },
   botaoTexto: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },

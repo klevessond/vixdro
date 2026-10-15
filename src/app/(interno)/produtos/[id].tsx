@@ -19,6 +19,7 @@ import {
 } from 'react-native';
 
 import {
+  metrosParaMm,
   CATEGORIAS,
   Componente,
   ItemCatalogo,
@@ -55,8 +56,9 @@ export default function EditorProduto() {
   const [seletorAberto, setSeletorAberto] = useState(false);
   const [edicao, setEdicao] = useState<Edicao | null>(null);
 
-  const [largura, setLargura] = useState('1200');
-  const [altura, setAltura] = useState('1000');
+  // Medidas do teste em metros ("1,2"), convertidas para mm no cálculo.
+  const [largura, setLargura] = useState('1,2');
+  const [altura, setAltura] = useState('1');
   const [simulacao, setSimulacao] = useState<Simulacao | null>(null);
   const [calculando, setCalculando] = useState(false);
 
@@ -105,8 +107,8 @@ export default function EditorProduto() {
 
   async function calcular() {
     // Medidas vazias contam como zero (ex: produto que só usa a altura).
-    const L = Math.round(numero(largura));
-    const A = Math.round(numero(altura));
+    const L = metrosParaMm(largura);
+    const A = metrosParaMm(altura);
     setCalculando(true);
     try {
       setSimulacao(await simular(L, A, produto.componentes));
@@ -193,7 +195,7 @@ export default function EditorProduto() {
         </View>
 
         <Text style={styles.secao}>Itens</Text>
-        <Text style={styles.ajuda}>L é a largura e A é a altura do vão. Toque num item para mudar a regra.</Text>
+        <Text style={styles.ajuda}>Toque num item para mudar quanto ele usa em cada peça.</Text>
         <View style={styles.caixa}>
           {produto.componentes.map((c, i) => (
             <View key={`${c.item}-${i}`}>
@@ -229,21 +231,21 @@ export default function EditorProduto() {
             <Text style={styles.secao}>Testar com medidas</Text>
             <View style={styles.medidas}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.rotulo}>Largura (mm)</Text>
+                <Text style={styles.rotulo}>Largura (m)</Text>
                 <TextInput
                   style={styles.input}
                   value={largura}
-                  onChangeText={(v) => setLargura(v.replace(/\D/g, ''))}
-                  keyboardType="number-pad"
+                  onChangeText={(v) => setLargura(v.replace(/[^0-9,.]/g, ''))}
+                  keyboardType="decimal-pad"
                 />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.rotulo}>Altura (mm)</Text>
+                <Text style={styles.rotulo}>Altura (m)</Text>
                 <TextInput
                   style={styles.input}
                   value={altura}
-                  onChangeText={(v) => setAltura(v.replace(/\D/g, ''))}
-                  keyboardType="number-pad"
+                  onChangeText={(v) => setAltura(v.replace(/[^0-9,.]/g, ''))}
+                  keyboardType="decimal-pad"
                 />
               </View>
             </View>
@@ -301,7 +303,7 @@ export default function EditorProduto() {
       <SeletorItem visivel={seletorAberto} onSelecionar={itemEscolhido} onFechar={() => setSeletorAberto(false)} />
       <EditorRegra
         componente={edicao?.componente ?? null}
-        contexto={{ largura_mm: Math.round(numero(largura)), altura_mm: Math.round(numero(altura)), quantidade: 1 }}
+        contexto={{ largura_mm: metrosParaMm(largura), altura_mm: metrosParaMm(altura), quantidade: 1 }}
         onSalvar={regraConfirmada}
         onRemover={edicao?.indice !== null ? removerComponente : undefined}
         onFechar={() => setEdicao(null)}

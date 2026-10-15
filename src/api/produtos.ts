@@ -19,7 +19,8 @@ export type ItemCatalogo = {
   miniatura_url?: string | null;
 };
 
-export type Fornecedor = { id: number; nome: string; slug: string };
+/** proprio = "Meus itens": os itens que o vidraceiro cadastrou (ex: vidros). */
+export type Fornecedor = { id: number; nome: string; slug: string; proprio: boolean };
 
 /** Como o consumo do item é medido. Mesma regra do servidor (produtos/calculo.py). */
 export type Modo = 'peca_comprimento' | 'metro' | 'area' | 'unidade';
@@ -210,6 +211,26 @@ export function consumoPorPeca(c: Componente, largura_mm: number, altura_mm: num
   return q;
 }
 
+/** Custo do que UMA peça consome deste item (pelo uso, não pela barra inteira). */
+export function custoPorPeca(c: Componente, largura_mm: number, altura_mm: number): number {
+  const q = consumoPorPeca(c, largura_mm, altura_mm);
+  const item = c.item_detalhe;
+  const preco = numero(item.preco);
+  if (modoDoItem(item) === 'peca_comprimento' && item.comprimento_mm) return (q / (item.comprimento_mm / 1000)) * preco;
+  return q * preco;
+}
+
+/** Converte "1,20" (metros) em 1200 (mm). Vazio ou inválido vira 0. */
+export function metrosParaMm(texto: string): number {
+  const n = parseFloat(String(texto).replace(',', '.'));
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 1000) : 0;
+}
+
+/** 1200 (mm) vira "1,2"; 0 vira "" (campo vazio). */
+export function mmParaMetros(mm: number): string {
+  return mm ? String(mm / 1000).replace('.', ',') : '';
+}
+
 /** Resumo legível da regra, ex: "2 m por peça", "4 un por peça" ou "2× largura + 2× altura". */
 export function resumoRegra(c: Componente): string {
   const un = unidadeConsumo(c.item_detalhe);
@@ -243,4 +264,32 @@ export function comoEVendido(item: ItemCatalogo): string {
     default:
       return `por ${item.unidade.toLowerCase()}`;
   }
+}
+
+// ---------- Itens próprios (o que não está no catálogo do fornecedor) ----------
+
+export type NovoItemProprio = {
+  id?: number;
+  codigo: string;
+  descricao: string;
+  unidade: 'M' | 'M2' | 'UN';
+  comprimento_mm: number | null; // só para peças inteiras (barras)
+  preco: string;
+};
+
+export async function listarMeusItens(): Promise<ItemCatalogo[]> {
+  return lerResposta(await apiFetch('/meus-itens/'), 'Não foi possível carregar seus itens.');
+}
+
+export async function salvarMeuItem(item: NovoItemProprio): Promise<ItemCatalogo> {
+  const corpo = JSON.stringify({ ...item, preco: item.preco.replace(',', '.') });
+  const res = item.id
+    ? await apiFetch(`/meus-itens/${item.id}/`, { method: 'PATCH', body: corpo })
+    : await apiFetch('/meus-itens/', { method: 'POST', body: corpo });
+  return lerResposta(res, 'Não foi possível salvar o item.');
+}
+
+export async function excluirMeuItem(id: number): Promise<void> {
+  const res = await apiFetch(`/meus-itens/${id}/`, { method: 'DELETE' });
+  if (!res.ok) await lerResposta(res, 'Não foi possível excluir o item.');
 }

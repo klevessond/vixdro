@@ -15,6 +15,7 @@ export type DadosOrcamento = {
   calculo: CalculoProjeto;
   vidraceiro: Vidraceiro;
   cliente: ClienteLocal | null;
+  logo?: string | null; // data:image/png;base64,... (vem do servidor)
 };
 
 function esc(texto: string | number | null | undefined): string {
@@ -50,10 +51,14 @@ function endereco(e: { rua?: string; numero?: string; complemento?: string; bair
   return [linha1, linha2].filter((s) => s.trim()).join(' · ');
 }
 
+function metros(mm: number): string {
+  return (mm / 1000).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 3 });
+}
+
 function medidas(largura: number, altura: number): string {
-  const t = largura && altura ? `${largura} × ${altura} mm`
-    : altura ? `altura ${altura} mm`
-    : largura ? `largura ${largura} mm` : '';
+  const t = largura && altura ? `${metros(largura)} × ${metros(altura)} m`
+    : altura ? `altura ${metros(altura)} m`
+    : largura ? `largura ${metros(largura)} m` : '';
   return t ? `<br><span class="suave">${t}</span>` : '';
 }
 
@@ -61,7 +66,7 @@ function dataBR(d: Date) {
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
-export function htmlOrcamento({ projeto, calculo, vidraceiro, cliente }: DadosOrcamento): string {
+export function htmlOrcamento({ projeto, calculo, vidraceiro, cliente, logo }: DadosOrcamento): string {
   const hoje = new Date();
   const validade = new Date(hoje);
   validade.setDate(validade.getDate() + (parseInt(projeto.validade_dias, 10) || 15));
@@ -89,6 +94,7 @@ export function htmlOrcamento({ projeto, calculo, vidraceiro, cliente }: DadosOr
   * { box-sizing: border-box; }
   body { font-family: -apple-system, 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #16292B; font-size: 12px; margin: 0; }
   .topo { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #1E5B57; padding-bottom: 14px; }
+  .logo { display: block; max-height: 64px; max-width: 200px; margin-bottom: 8px; }
   .empresa { font-size: 20px; font-weight: 800; color: #1E5B57; margin: 0 0 4px; }
   .suave { color: #546B6D; }
   .doc { text-align: right; }
@@ -109,6 +115,7 @@ export function htmlOrcamento({ projeto, calculo, vidraceiro, cliente }: DadosOr
 <body>
   <div class="topo">
     <div>
+      ${logo && logo.startsWith('data:image/') ? `<img class="logo" src="${logo}" alt="">` : ''}
       <p class="empresa">${esc(nomeEmpresa)}</p>
       ${vidraceiro.empresa ? `<div>${esc(vidraceiro.nome)}</div>` : ''}
       <div class="suave">

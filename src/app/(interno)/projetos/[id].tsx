@@ -41,6 +41,7 @@ import {
   salvarProjeto,
 } from '@/api/projetos';
 import { useAuth } from '@/auth/AuthContext';
+import { obterLogo } from '@/api/empresa';
 import { compartilharOrcamentoPdf } from '@/pdf/orcamentoPdf';
 import { COR } from '@/components/produtos/cores';
 import { AjustesOrcamento, ValoresAjuste } from '@/components/projetos/AjustesOrcamento';
@@ -255,11 +256,13 @@ export default function EditorProjeto() {
       const resultado = calculo ?? (await calcularProjeto(projeto));
       setCalculo(resultado);
       const cliente = await obterClienteLocal(projeto.cliente);
+      const logo = await obterLogo().then((l) => l.logo_data_uri).catch(() => null);
       await compartilharOrcamentoPdf({
         projeto: { ...projeto, numero: numeroOrcamento },
         calculo: resultado,
         vidraceiro,
         cliente,
+        logo,
       });
       // Orçamento compartilhado: sai de "rascunho" para "enviado".
       if (!projeto.status || projeto.status === 'rascunho') {
