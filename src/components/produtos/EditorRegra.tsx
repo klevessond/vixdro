@@ -22,6 +22,7 @@ import {
 } from 'react-native';
 
 import {
+  Cobranca,
   Componente,
   comoEVendido,
   consumoPorPeca,
@@ -63,6 +64,7 @@ export function EditorRegra({ componente, contexto, onSalvar, onRemover, onFecha
   const [vezesArea, setVezesArea] = useState('');
   const [ajusteMm, setAjusteMm] = useState('');
   const [observacao, setObservacao] = useState('');
+  const [cobranca, setCobranca] = useState<Cobranca>('inteira');
   const [erro, setErro] = useState<string | null>(null);
 
   const item = componente?.item_detalhe;
@@ -80,6 +82,7 @@ export function EditorRegra({ componente, contexto, onSalvar, onRemover, onFecha
     const aj = numero(componente.ajuste);
     setAjusteMm(f ? '' : texto(linear ? Math.round(aj * 1000) : aj));
     setObservacao(componente.observacao);
+    setCobranca(componente.cobranca ?? 'inteira');
     setErro(null);
   }, [componente]);
 
@@ -91,7 +94,9 @@ export function EditorRegra({ componente, contexto, onSalvar, onRemover, onFecha
   // Monta o componente com o que está digitado agora (para a conta e para salvar).
   function montar(): Componente {
     if (forma === 'fixa') {
-      return { ...componente!, coef_largura: '0', coef_altura: '0', coef_area: '0', ajuste: String(numero(fixa)) };
+      return {
+        ...componente!, coef_largura: '0', coef_altura: '0', coef_area: '0', ajuste: String(numero(fixa)), cobranca,
+      };
     }
     const aj = linear ? numero(ajusteMm) / 1000 : numero(ajusteMm);
     return {
@@ -100,6 +105,7 @@ export function EditorRegra({ componente, contexto, onSalvar, onRemover, onFecha
       coef_altura: String(numero(vezesA)),
       coef_area: String(numero(vezesArea)),
       ajuste: String(Number(aj.toFixed(4))),
+      cobranca,
     };
   }
 
@@ -125,8 +131,12 @@ export function EditorRegra({ componente, contexto, onSalvar, onRemover, onFecha
   const total = porPeca * ctx.quantidade;
   const comprimentoM = (item.comprimento_mm ?? 0) / 1000;
   const barras = modo === 'peca_comprimento' && comprimentoM ? Math.ceil(total / comprimentoM - 1e-9) : null;
-  const custo = modo === 'peca_comprimento' && comprimentoM
-    ? (total / comprimentoM) * numero(item.preco)
+  // Itens em barra: barras inteiras (padrão) ou só os metros usados.
+  const porBarra = modo === 'peca_comprimento' && !!comprimentoM;
+  const custo = porBarra
+    ? cobranca === 'inteira'
+      ? (barras ?? 0) * numero(item.preco)
+      : (total / comprimentoM) * numero(item.preco)
     : total * numero(item.preco);
 
   return (
@@ -202,6 +212,26 @@ export function EditorRegra({ componente, contexto, onSalvar, onRemover, onFecha
             </>
           )}
 
+          {modo === 'peca_comprimento' && !!comprimentoM && (
+            <>
+              <Text style={styles.rotulo}>Como cobrar este perfil?</Text>
+              <View style={styles.abas}>
+                {([
+                  ['inteira', 'Barra inteira'],
+                  ['metro', 'Por metro usado'],
+                ] as [Cobranca, string][]).map(([valor, rotulo]) => (
+                  <Pressable
+                    key={valor}
+                    onPress={() => setCobranca(valor)}
+                    style={[styles.aba, cobranca === valor && styles.abaAtiva]}
+                  >
+                    <Text style={[styles.abaTexto, cobranca === valor && styles.abaTextoAtiva]}>{rotulo}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </>
+          )}
+
           <View style={styles.conta}>
             <Text style={styles.contaTitulo}>
               {contexto
@@ -223,7 +253,11 @@ export function EditorRegra({ componente, contexto, onSalvar, onRemover, onFecha
                   </Text>
                 )}
                 <Text style={styles.contaCusto}>
-                  Custo considerado: {fmt(total, 3)} {un} = {reais(custo)}
+                  Custo considerado:{' '}
+                  {porBarra && cobranca === 'inteira'
+                    ? `${barras} ${barras === 1 ? 'barra inteira' : 'barras inteiras'}`
+                    : `${fmt(total, 3)} ${un}`}{' '}
+                  = {reais(custo)}
                 </Text>
               </>
             )}

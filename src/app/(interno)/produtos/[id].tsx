@@ -86,6 +86,7 @@ export default function EditorProduto() {
       coef_altura: '0',
       coef_area: modoDoItem(item) === 'area' ? '1' : '0',
       ajuste: '0',
+      cobranca: 'inteira',
       observacao: '',
     };
     setTimeout(() => setEdicao({ indice: null, componente }), ESPERA_MODAL);

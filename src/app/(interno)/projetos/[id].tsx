@@ -291,15 +291,36 @@ export default function EditorProjeto() {
   }
 
   function confirmarPedido() {
+    if (!jaExiste || alterado) {
+      Alert.alert('Salve primeiro', 'Salve o projeto antes de enviar o pedido ao fornecedor.');
+      return;
+    }
     const valor = calculo && mostrarCustos ? ` no valor estimado de ${reais(calculo.custo_compra)}` : '';
-    Alert.alert(
-      'Enviar pedido ao fornecedor',
-      `A lista de compra deste projeto será enviada${valor}. Depois disso, o projeto não pode mais ser alterado.`,
-      [
+    const aviso = `A lista de compra deste projeto será enviada ao fornecedor${valor}. Depois disso, o projeto não pode mais ser alterado.`;
+
+    // O pedido só faz sentido com o orçamento aprovado pelo cliente.
+    if (projeto.status !== 'aprovado') {
+      Alert.alert('O cliente aprovou o orçamento?', `O orçamento será marcado como aprovado. ${aviso}`, [
         { text: 'Cancelar', style: 'cancel' },
-        { text: 'Enviar pedido', onPress: fazerPedido },
-      ]
-    );
+        {
+          text: 'Aprovado, enviar pedido',
+          onPress: async () => {
+            try {
+              const status = await alterarStatus(projeto.id, 'aprovado');
+              setProjeto((p) => ({ ...p, status }));
+              await fazerPedido();
+            } catch (e: any) {
+              Alert.alert('Não foi possível enviar', e?.message ?? 'Tente novamente.');
+            }
+          },
+        },
+      ]);
+      return;
+    }
+    Alert.alert('Enviar pedido ao fornecedor', aviso, [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Enviar pedido', onPress: fazerPedido },
+    ]);
   }
 
   async function fazerPedido() {
@@ -411,52 +432,6 @@ export default function EditorProjeto() {
               Este projeto já tem pedido no fornecedor, por isso não pode mais ser alterado.
             </Text>
           </View>
-        )}
-
-        {projeto.status === 'aprovado' && (
-          <>
-            <Text style={styles.secao}>Pedido ao fornecedor</Text>
-            {pedidos.map((p) => (
-              <View key={p.id} style={styles.caixaResultado}>
-                <View style={styles.resultadoLinha}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.resultadoNome}>{p.fornecedor_nome}</Text>
-                    <Text style={styles.resultadoDetalhe}>
-                      {p.numero_fornecedor ? `Pedido nº ${p.numero_fornecedor} · ` : ''}
-                      {p.itens.length} {p.itens.length === 1 ? 'item' : 'itens'}
-                    </Text>
-                  </View>
-                  {mostrarCustos && <Text style={styles.resultadoValor}>{reais(p.total)}</Text>}
-                </View>
-                <Text style={[styles.pedidoStatus, p.status === 'erro' && { color: COR.erro }]}>
-                  {p.status_texto}
-                </Text>
-                {!!p.erro && <Text style={styles.nota}>{p.erro}</Text>}
-                {p.status !== 'cancelado' && (
-                  <Pressable style={[styles.botaoContorno, { marginTop: 10 }]} onPress={() => acaoPedido(p)} disabled={ocupadoPedido !== null}>
-                    {ocupadoPedido === p.id ? (
-                      <ActivityIndicator color={COR.borda} />
-                    ) : (
-                      <Text style={styles.link}>{p.status === 'erro' ? 'Tentar enviar de novo' : 'Atualizar situação'}</Text>
-                    )}
-                  </Pressable>
-                )}
-              </View>
-            ))}
-            {!congelado && !pedidos.some((p) => p.status === 'erro') && (
-              <Pressable
-                style={({ pressed }) => [styles.botao, { marginTop: 0 }, pressed && { backgroundColor: COR.bordaEscura }]}
-                onPress={confirmarPedido}
-                disabled={ocupadoPedido !== null}
-              >
-                {ocupadoPedido === 'novo' ? (
-                  <ActivityIndicator color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.botaoTexto}>Enviar pedido ao fornecedor</Text>
-                )}
-              </Pressable>
-            )}
-          </>
         )}
 
         <Text style={styles.secao}>Peças</Text>
@@ -649,6 +624,63 @@ export default function EditorProjeto() {
             )}
           </Pressable>
         )}
+        {projeto.linhas.length > 0 && (
+          <Text style={[styles.nota, { textAlign: 'center' }]}>
+            O PDF vai só para o cliente. O pedido ao fornecedor tem botão próprio.
+          </Text>
+        )}
+
+        {jaExiste && projeto.linhas.length > 0 && (
+          <>
+            <Text style={styles.secao}>Pedido ao fornecedor</Text>
+            {!pedidos.length && (
+              <Text style={styles.nota}>
+                Separado do orçamento: compartilhar o PDF com o cliente não envia nada ao fornecedor.
+              </Text>
+            )}
+            {pedidos.map((p) => (
+              <View key={p.id} style={styles.caixaResultado}>
+                <View style={styles.resultadoLinha}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.resultadoNome}>{p.fornecedor_nome}</Text>
+                    <Text style={styles.resultadoDetalhe}>
+                      {p.numero_fornecedor ? `Pedido nº ${p.numero_fornecedor} · ` : ''}
+                      {p.itens.length} {p.itens.length === 1 ? 'item' : 'itens'}
+                    </Text>
+                  </View>
+                  {mostrarCustos && <Text style={styles.resultadoValor}>{reais(p.total)}</Text>}
+                </View>
+                <Text style={[styles.pedidoStatus, p.status === 'erro' && { color: COR.erro }]}>
+                  {p.status_texto}
+                </Text>
+                {!!p.erro && <Text style={styles.nota}>{p.erro}</Text>}
+                {p.status !== 'cancelado' && (
+                  <Pressable style={[styles.botaoContorno, { marginTop: 10 }]} onPress={() => acaoPedido(p)} disabled={ocupadoPedido !== null}>
+                    {ocupadoPedido === p.id ? (
+                      <ActivityIndicator color={COR.borda} />
+                    ) : (
+                      <Text style={styles.link}>{p.status === 'erro' ? 'Tentar enviar de novo' : 'Atualizar situação'}</Text>
+                    )}
+                  </Pressable>
+                )}
+              </View>
+            ))}
+            {!congelado && !pedidos.some((p) => p.status === 'erro') && (
+              <Pressable
+                style={({ pressed }) => [styles.botao, { marginTop: 0 }, pressed && { backgroundColor: COR.bordaEscura }]}
+                onPress={confirmarPedido}
+                disabled={ocupadoPedido !== null}
+              >
+                {ocupadoPedido === 'novo' ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.botaoTexto}>Enviar pedido ao fornecedor</Text>
+                )}
+              </Pressable>
+            )}
+          </>
+        )}
+
         {jaExiste && !congelado && (
           <Pressable style={styles.excluir} onPress={excluir}>
             <Text style={styles.excluirTexto}>Excluir projeto</Text>

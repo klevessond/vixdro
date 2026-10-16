@@ -17,8 +17,14 @@ import {
   InputAccessoryView,
   Keyboard,
   Platform,
+  useWindowDimensions,
 } from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+
+import { LARGURA_FORMULARIO, cor, espaco, raio, sombra } from "@/ui/tema";
 import { SeletorEstado } from "./SeletorEstado";
+
+type NomeIcone = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
 export interface DadosCliente {
   nome: string;
@@ -87,6 +93,9 @@ export function CadastroClienteForm({
   cpfObrigatorio = true,
   emailObrigatorio = true,
 }: CadastroClienteFormProps) {
+  // Tela larga (computador/tablet): campos lado a lado.
+  const { width } = useWindowDimensions();
+  const largo = width >= 680;
   const [dados, setDados] = useState<DadosCliente>(DADOS_INICIAIS);
   const [erros, setErros] = useState<Erros>({});
   const [enviando, setEnviando] = useState(false);
@@ -231,79 +240,83 @@ export function CadastroClienteForm({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.secao}>Dados de contato</Text>
+      <Secao icone="card-account-details-outline" titulo="Dados de contato">
+        <Linha largo={largo}>
+          <Campo
+            label="Nome"
+            valor={dados.nome}
+            onAlterar={(v) => atualizarCampo("nome", v)}
+            erro={erros.nome}
+            placeholder="Nome completo"
+            autoCapitalizar="words"
+          />
+          <Campo
+            label="Nome da empresa"
+            valor={dados.nomeEmpresa}
+            onAlterar={(v) => atualizarCampo("nomeEmpresa", v)}
+            placeholder="Opcional, se for pessoa física"
+          />
+        </Linha>
+        <Linha largo={largo}>
+          <Campo
+            label={emailObrigatorio ? "E-mail" : "E-mail (opcional)"}
+            valor={dados.email}
+            onAlterar={(v) => atualizarCampo("email", v)}
+            erro={erros.email}
+            placeholder="voce@exemplo.com"
+            teclado="email-address"
+            autoCapitalizar="none"
+          />
+          <Campo
+            label="Celular"
+            valor={dados.celular}
+            onAlterar={(v) => atualizarCampo("celular", formatarCelular(v))}
+            erro={erros.celular}
+            placeholder="(00) 00000-0000"
+            teclado="phone-pad"
+          />
+        </Linha>
+        <Linha largo={largo}>
+          <Campo
+            label={cpfObrigatorio ? "CPF ou CNPJ" : "CPF ou CNPJ (opcional)"}
+            valor={dados.cpfCnpj}
+            onAlterar={(v) => atualizarCampo("cpfCnpj", formatarCpfCnpj(v))}
+            erro={erros.cpfCnpj}
+            placeholder="000.000.000-00"
+            teclado="numeric"
+          />
+          {largo ? <View /> : null}
+        </Linha>
+      </Secao>
 
-      <Campo
-        label="Nome"
-        valor={dados.nome}
-        onAlterar={(v) => atualizarCampo("nome", v)}
-        erro={erros.nome}
-        placeholder="Seu nome completo"
-      />
-      <Campo
-        label="Nome da empresa"
-        valor={dados.nomeEmpresa}
-        onAlterar={(v) => atualizarCampo("nomeEmpresa", v)}
-        placeholder="Opcional, se for pessoa física"
-      />
-      <Campo
-        label={emailObrigatorio ? "E-mail" : "E-mail (opcional)"}
-        valor={dados.email}
-        onAlterar={(v) => atualizarCampo("email", v)}
-        erro={erros.email}
-        placeholder="voce@exemplo.com"
-        teclado="email-address"
-        autoCapitalizar="none"
-      />
-      <Campo
-        label="Celular"
-        valor={dados.celular}
-        onAlterar={(v) => atualizarCampo("celular", formatarCelular(v))}
-        erro={erros.celular}
-        placeholder="(00) 00000-0000"
-        teclado="phone-pad"
-      />
-      <Campo
-        label={cpfObrigatorio ? "CPF ou CNPJ" : "CPF ou CNPJ (opcional)"}
-        valor={dados.cpfCnpj}
-        onAlterar={(v) => atualizarCampo("cpfCnpj", formatarCpfCnpj(v))}
-        erro={erros.cpfCnpj}
-        placeholder="000.000.000-00"
-        teclado="numeric"
-      />
-
-      <Text style={styles.secao}>Endereço</Text>
-
-      <View>
-        <Campo
-          label="CEP"
-          valor={dados.cep}
-          onAlterar={(v) => {
-            const formatado = formatarCep(v);
-            atualizarCampo("cep", formatado);
-            if (formatado.replace(/\D/g, "").length === 8) {
-              buscarEnderecoPeloCep(formatado);
-            }
-          }}
-          erro={erros.cep}
-          placeholder="00000-000"
-          teclado="numeric"
-        />
-        {buscandoCep && (
-          <ActivityIndicator style={styles.loadingCep} size="small" color="#007AFF" />
-        )}
-      </View>
-
-      <Campo
-        label="Rua"
-        valor={dados.rua}
-        onAlterar={(v) => atualizarCampo("rua", v)}
-        erro={erros.rua}
-        placeholder="Preenchido automaticamente pelo CEP"
-      />
-
-      <View style={styles.linha}>
-        <View style={styles.colunaPequena}>
+      <Secao icone="map-marker-outline" titulo="Endereço">
+        <Linha largo={largo} proporcao={[1, 2]}>
+          <View>
+            <Campo
+              label="CEP"
+              valor={dados.cep}
+              onAlterar={(v) => {
+                const formatado = formatarCep(v);
+                atualizarCampo("cep", formatado);
+                if (formatado.replace(/\D/g, "").length === 8) {
+                  buscarEnderecoPeloCep(formatado);
+                }
+              }}
+              erro={erros.cep}
+              placeholder="00000-000"
+              teclado="numeric"
+            />
+            {buscandoCep && <ActivityIndicator style={styles.loadingCep} size="small" color={cor.marca} />}
+          </View>
+          <Campo
+            label="Rua"
+            valor={dados.rua}
+            onAlterar={(v) => atualizarCampo("rua", v)}
+            erro={erros.rua}
+            placeholder="Preenchida pelo CEP"
+          />
+        </Linha>
+        <Linha largo proporcao={[1, 2]}>
           <Campo
             label="Número"
             valor={dados.numero}
@@ -315,61 +328,60 @@ export function CadastroClienteForm({
             autoCapitalizar="characters"
             refInput={numeroRef}
           />
-        </View>
-        <View style={styles.colunaGrande}>
           <Campo
             label="Complemento"
             valor={dados.complemento}
             onAlterar={(v) => atualizarCampo("complemento", v)}
-            placeholder="Sala, bloco, etc. (opcional)"
+            placeholder="Sala, bloco (opcional)"
           />
-        </View>
-      </View>
-
-      <Campo
-        label="Bairro"
-        valor={dados.bairro}
-        onAlterar={(v) => atualizarCampo("bairro", v)}
-        erro={erros.bairro}
-      />
-      <Campo
-        label="Cidade"
-        valor={dados.cidade}
-        onAlterar={(v) => atualizarCampo("cidade", v)}
-        erro={erros.cidade}
-      />
-
-      <SeletorEstado
-        valor={dados.estado}
-        onSelecionar={(sigla) => atualizarCampo("estado", sigla)}
-        erro={erros.estado}
-      />
+        </Linha>
+        <Linha largo={largo}>
+          <Campo
+            label="Bairro"
+            valor={dados.bairro}
+            onAlterar={(v) => atualizarCampo("bairro", v)}
+            erro={erros.bairro}
+          />
+          <Campo
+            label="Cidade"
+            valor={dados.cidade}
+            onAlterar={(v) => atualizarCampo("cidade", v)}
+            erro={erros.cidade}
+          />
+        </Linha>
+        <SeletorEstado
+          valor={dados.estado}
+          onSelecionar={(sigla) => atualizarCampo("estado", sigla)}
+          erro={erros.estado}
+        />
+      </Secao>
 
       {comSenha && (
-        <>
-          <Text style={styles.secao}>Acesso ao app</Text>
-          <Campo
-            label="Senha"
-            valor={senha}
-            onAlterar={(v) => {
-              setSenha(v);
-              if (errosSenha.senha) setErrosSenha((p) => ({ ...p, senha: undefined }));
-            }}
-            erro={errosSenha.senha}
-            placeholder={`Pelo menos ${SENHA_MINIMA} caracteres`}
-            senha
-          />
-          <Campo
-            label="Confirme a senha"
-            valor={confirmarSenha}
-            onAlterar={(v) => {
-              setConfirmarSenha(v);
-              if (errosSenha.confirmar) setErrosSenha((p) => ({ ...p, confirmar: undefined }));
-            }}
-            erro={errosSenha.confirmar}
-            senha
-          />
-        </>
+        <Secao icone="lock-outline" titulo="Acesso ao app">
+          <Linha largo={largo}>
+            <Campo
+              label="Senha"
+              valor={senha}
+              onAlterar={(v) => {
+                setSenha(v);
+                if (errosSenha.senha) setErrosSenha((p) => ({ ...p, senha: undefined }));
+              }}
+              erro={errosSenha.senha}
+              placeholder={`Pelo menos ${SENHA_MINIMA} caracteres`}
+              senha
+            />
+            <Campo
+              label="Confirme a senha"
+              valor={confirmarSenha}
+              onAlterar={(v) => {
+                setConfirmarSenha(v);
+                if (errosSenha.confirmar) setErrosSenha((p) => ({ ...p, confirmar: undefined }));
+              }}
+              erro={errosSenha.confirmar}
+              senha
+            />
+          </Linha>
+        </Secao>
       )}
 
       {camposExtras}
@@ -385,9 +397,10 @@ export function CadastroClienteForm({
       )}
 
       <TouchableOpacity
-        style={[styles.botao, enviando && styles.botaoDesabilitado]}
+        style={[styles.botao, largo && styles.botaoLargo, enviando && styles.botaoDesabilitado]}
         onPress={handleSubmeter}
         disabled={enviando}
+        activeOpacity={0.85}
       >
         {enviando ? (
           <ActivityIndicator color="#fff" />
@@ -395,6 +408,46 @@ export function CadastroClienteForm({
           <Text style={styles.botaoTexto}>{textoBotao}</Text>
         )}
       </TouchableOpacity>
+    </View>
+  );
+}
+
+// --- Seção em cartão, com ícone e título ---
+
+function Secao({ icone, titulo, children }: { icone: NomeIcone; titulo: string; children: React.ReactNode }) {
+  return (
+    <View style={styles.cartao}>
+      <View style={styles.secaoCabecalho}>
+        <View style={styles.secaoIcone}>
+          <MaterialCommunityIcons name={icone} size={20} color={cor.marca} />
+        </View>
+        <Text style={styles.secao}>{titulo}</Text>
+      </View>
+      {children}
+    </View>
+  );
+}
+
+// --- Campos lado a lado na tela larga; um embaixo do outro no celular ---
+
+function Linha({
+  largo,
+  proporcao,
+  children,
+}: {
+  largo: boolean;
+  proporcao?: number[];
+  children: React.ReactNode;
+}) {
+  const filhos = React.Children.toArray(children);
+  if (!largo) return <>{filhos}</>;
+  return (
+    <View style={styles.linha}>
+      {filhos.map((filho, i) => (
+        <View key={i} style={{ flex: proporcao?.[i] ?? 1, minWidth: 0 }}>
+          {filho}
+        </View>
+      ))}
     </View>
   );
 }
@@ -433,7 +486,7 @@ function Campo({
         value={valor}
         onChangeText={onAlterar}
         placeholder={placeholder}
-        placeholderTextColor="#999"
+        placeholderTextColor="#93A3A5"
         keyboardType={teclado}
         autoCapitalize={senha ? "none" : autoCapitalizar}
         autoCorrect={!senha}
@@ -449,39 +502,49 @@ function Campo({
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16 },
-  secao: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#333",
-    marginTop: 8,
-    marginBottom: 12,
+  container: { padding: espaco.lg, width: "100%", maxWidth: LARGURA_FORMULARIO, alignSelf: "center" },
+  cartao: {
+    backgroundColor: cor.cartao,
+    borderRadius: raio.cartao,
+    borderWidth: 1,
+    borderColor: cor.borda,
+    padding: espaco.lg,
+    paddingBottom: espaco.xs,
+    marginBottom: espaco.lg,
+    ...sombra,
   },
-  campoContainer: { marginBottom: 16 },
-  label: { fontSize: 14, fontWeight: "600", marginBottom: 6, color: "#333" },
+  secaoCabecalho: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: espaco.lg },
+  secaoIcone: {
+    width: 34, height: 34, borderRadius: 9, backgroundColor: cor.marcaClara,
+    alignItems: "center", justifyContent: "center",
+  },
+  secao: { fontSize: 16, fontWeight: "800", color: cor.texto },
+  campoContainer: { marginBottom: espaco.lg },
+  label: { fontSize: 13, fontWeight: "600", marginBottom: 6, color: cor.texto },
   input: {
     borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
+    borderColor: cor.borda,
+    borderRadius: raio.campo,
     paddingHorizontal: 12,
-    paddingVertical: 12,
-    fontSize: 16,
-    backgroundColor: "#fff",
+    paddingVertical: 11,
+    fontSize: 15,
+    color: cor.texto,
+    backgroundColor: cor.fundo,
   },
-  inputErro: { borderColor: "#e53e3e" },
-  textoErro: { color: "#e53e3e", fontSize: 12, marginTop: 4 },
-  linha: { flexDirection: "row", gap: 12 },
-  colunaPequena: { width: "30%" },
-  colunaGrande: { width: "66%" },
-  loadingCep: { position: "absolute", right: 12, top: 38 },
+  inputErro: { borderColor: cor.erro, backgroundColor: cor.erroFundo },
+  textoErro: { color: cor.erro, fontSize: 12, marginTop: 4 },
+  linha: { flexDirection: "row", gap: espaco.lg },
+  loadingCep: { position: "absolute", right: 12, top: 36 },
   botao: {
-    backgroundColor: "#007AFF",
-    borderRadius: 8,
-    paddingVertical: 16,
+    backgroundColor: cor.marca,
+    borderRadius: raio.botao,
+    paddingVertical: 15,
     alignItems: "center",
-    marginTop: 12,
+    marginTop: espaco.xs,
   },
+  botaoLargo: { alignSelf: "flex-end", paddingHorizontal: 40 },
   botaoDesabilitado: { opacity: 0.6 },
+  botaoTexto: { color: "#fff", fontSize: 16, fontWeight: "700" },
   barraTeclado: {
     flexDirection: "row",
     justifyContent: "flex-end",
@@ -491,6 +554,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
-  barraTecladoBotao: { color: "#1E5B57", fontSize: 16, fontWeight: "700" },
-  botaoTexto: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  barraTecladoBotao: { color: cor.marca, fontSize: 16, fontWeight: "700" },
 });

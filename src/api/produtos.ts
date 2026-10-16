@@ -33,7 +33,11 @@ export type Componente = {
   coef_area: string;
   ajuste: string; // metros para perfis, m² para vidro, unidades para acessórios
   observacao: string;
+  // Só para itens vendidos em barra: cobrar a barra inteira (padrão) ou só os metros usados.
+  cobranca?: Cobranca;
 };
+
+export type Cobranca = 'inteira' | 'metro';
 
 export type Categoria = 'janela' | 'porta' | 'portao' | 'box' | 'outro';
 
@@ -211,13 +215,32 @@ export function consumoPorPeca(c: Componente, largura_mm: number, altura_mm: num
   return q;
 }
 
-/** Custo do que UMA peça consome deste item (pelo uso, não pela barra inteira). */
-export function custoPorPeca(c: Componente, largura_mm: number, altura_mm: number): number {
-  const q = consumoPorPeca(c, largura_mm, altura_mm);
+/** Item vendido em barra (perfis): é o único em que a cobrança inteira/metro faz diferença. */
+export function vendidoEmBarra(item: ItemCatalogo): boolean {
+  return modoDoItem(item) === 'peca_comprimento' && !!item.comprimento_mm;
+}
+
+/** Barras inteiras necessárias para o total das unidades da peça (mesma conta do servidor). */
+export function barrasNecessarias(c: Componente, largura_mm: number, altura_mm: number, quantidade: number): number {
+  const comprimento = (c.item_detalhe.comprimento_mm ?? 0) / 1000;
+  if (!comprimento) return 0;
+  return Math.ceil((consumoPorPeca(c, largura_mm, altura_mm) * quantidade) / comprimento - 1e-9);
+}
+
+/**
+ * Custo do item para TODAS as unidades da peça. Em itens de barra, conforme a
+ * cobrança: barras inteiras (padrão) ou só os metros usados. O arredondamento
+ * é sobre o total: 4 janelas de 2 m (8 m) pagam 2 barras, e não 4.
+ */
+export function custoTotalItem(c: Componente, largura_mm: number, altura_mm: number, quantidade: number): number {
   const item = c.item_detalhe;
   const preco = numero(item.preco);
-  if (modoDoItem(item) === 'peca_comprimento' && item.comprimento_mm) return (q / (item.comprimento_mm / 1000)) * preco;
-  return q * preco;
+  const total = consumoPorPeca(c, largura_mm, altura_mm) * quantidade;
+  if (vendidoEmBarra(item)) {
+    if ((c.cobranca ?? 'inteira') === 'metro') return (total / (item.comprimento_mm! / 1000)) * preco;
+    return barrasNecessarias(c, largura_mm, altura_mm, quantidade) * preco;
+  }
+  return total * preco;
 }
 
 /** Converte "1,20" (metros) em 1200 (mm). Vazio ou inválido vira 0. */

@@ -21,7 +21,9 @@ import {
   Componente,
   ItemCatalogo,
   consumoPorPeca,
-  custoPorPeca,
+  barrasNecessarias,
+  custoTotalItem,
+  vendidoEmBarra,
   metrosParaMm,
   mmParaMetros,
   modoDoItem,
@@ -79,8 +81,10 @@ export function EditorPeca({ peca, nova, onSalvar, onRemover, onFechar }: Props)
     return (usaL && !L) || (usaA && !A);
   }
 
-  // Custo do consumo de UMA peça (null se falta medida em algum item).
-  const custoDaPeca = itens.some(faltaMedida) ? null : itens.reduce((t, c) => t + custoPorPeca(c, L, A), 0);
+  // Custo dos itens para TODAS as unidades da peça (null se falta medida).
+  // Itens em barra seguem a cobrança escolhida: barras inteiras ou metros usados.
+  const custoTotalPeca = itens.some(faltaMedida) ? null : itens.reduce((t, c) => t + custoTotalItem(c, L, A, Q), 0);
+  const custoDaPeca = custoTotalPeca === null ? null : custoTotalPeca / Q;
 
   /** "8 m no total" (ou vazio, se falta a medida que o item usa). */
   function totalDoItem(c: Componente): string {
@@ -88,7 +92,12 @@ export function EditorPeca({ peca, nova, onSalvar, onRemover, onFechar }: Props)
     const usaA = numero(c.coef_altura) !== 0 || numero(c.coef_area) !== 0;
     if ((usaL && !L) || (usaA && !A)) return 'falta medida';
     const total = consumoPorPeca(c, L, A) * Q;
-    return `${total.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} ${unidadeConsumo(c.item_detalhe)}`;
+    const texto = `${total.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} ${unidadeConsumo(c.item_detalhe)}`;
+    if (vendidoEmBarra(c.item_detalhe) && (c.cobranca ?? 'inteira') === 'inteira' && total > 0) {
+      const b = barrasNecessarias(c, L, A, Q);
+      return `${texto} · ${b} ${b === 1 ? 'barra' : 'barras'}`;
+    }
+    return texto;
   }
 
   function itemEscolhido(item: ItemCatalogo) {
@@ -101,6 +110,7 @@ export function EditorPeca({ peca, nova, onSalvar, onRemover, onFechar }: Props)
       // Vidro começa como "1 vez a área"; o resto, como quantidade fixa a preencher.
       coef_area: modoDoItem(item) === 'area' ? '1' : '0',
       ajuste: '0',
+      cobranca: 'inteira',
       observacao: '',
     };
     setTimeout(() => setEdicao({ indice: null, componente }), ESPERA_MODAL);
@@ -231,7 +241,7 @@ export function EditorPeca({ peca, nova, onSalvar, onRemover, onFechar }: Props)
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
                     <Text style={styles.total}>{totalDoItem(c)}</Text>
-                    {!faltaMedida(c) && <Text style={styles.custoItem}>{reais(custoPorPeca(c, L, A) * Q)}</Text>}
+                    {!faltaMedida(c) && <Text style={styles.custoItem}>{reais(custoTotalItem(c, L, A, Q))}</Text>}
                   </View>
                 </Pressable>
               </View>
@@ -258,10 +268,12 @@ export function EditorPeca({ peca, nova, onSalvar, onRemover, onFechar }: Props)
                   {Q > 1 && (
                     <View style={styles.custoLinha}>
                       <Text style={styles.custoTexto}>Total ({Q} peças)</Text>
-                      <Text style={styles.custoTotal}>{reais(custoDaPeca * Q)}</Text>
+                      <Text style={styles.custoTotal}>{reais(custoTotalPeca!)}</Text>
                     </View>
                   )}
-                  <Text style={styles.custoNota}>Pelo que é usado, não pelas barras compradas.</Text>
+                  <Text style={styles.custoNota}>
+                    Perfis cobrados conforme escolhido em cada item: barra inteira ou só os metros usados.
+                  </Text>
                 </>
               )}
             </View>

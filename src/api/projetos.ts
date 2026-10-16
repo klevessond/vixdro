@@ -37,7 +37,7 @@ export type StatusProjeto = 'rascunho' | 'enviado' | 'aprovado' | 'recusado';
 
 export const STATUS_PROJETO: { valor: StatusProjeto; rotulo: string; cor: string }[] = [
   { valor: 'rascunho', rotulo: 'Rascunho', cor: '#546B6D' },
-  { valor: 'enviado', rotulo: 'Enviado', cor: '#8A5A00' },
+  { valor: 'enviado', rotulo: 'Enviado ao cliente', cor: '#8A5A00' },
   { valor: 'aprovado', rotulo: 'Aprovado', cor: '#1E6B3A' },
   { valor: 'recusado', rotulo: 'Recusado', cor: '#A32121' },
 ];
