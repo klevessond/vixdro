@@ -30,6 +30,12 @@ const CAMPOS: Campo[] = [
   { chave: 'mao_de_obra_minima_padrao', rotulo: 'Mão de obra mínima por peça (R$)', ajuda: 'Para peças pequenas não saírem baratas demais.' },
   { chave: 'perda_padrao', rotulo: 'Perda no corte dos perfis (%)', ajuda: 'Folga para calcular quantas barras comprar. Não entra no preço: o custo é pelo que é usado.' },
   { chave: 'validade_padrao', rotulo: 'Validade do orçamento (dias)', ajuda: 'Aparece no PDF como "Válido até".', inteiro: true },
+  {
+    chave: 'dias_lembrete',
+    rotulo: 'Lembrar de orçamento sem resposta após (dias)',
+    ajuda: 'Orçamentos enviados ao cliente há mais tempo que isso aparecem como lembrete na tela inicial.',
+    inteiro: true,
+  },
 ];
 
 function paraTexto(v: string | number) {
@@ -61,7 +67,9 @@ export default function PrecosScreen() {
     setSalvando(true);
     try {
       const envio = {} as PrecosPadrao;
-      CAMPOS.forEach((c) => ((envio as any)[c.chave] = valores[c.chave] || (c.inteiro ? '15' : '0')));
+      // Campo inteiro vazio volta ao padrão (15 dias de validade, 5 de lembrete).
+      const padrao: Record<string, string> = { validade_padrao: '15', dias_lembrete: '5' };
+      CAMPOS.forEach((c) => ((envio as any)[c.chave] = valores[c.chave] || padrao[c.chave] || '0'));
       await salvarPrecosPadrao(envio);
       router.back();
     } catch (e: any) {

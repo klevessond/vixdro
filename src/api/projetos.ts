@@ -254,3 +254,32 @@ export async function alterarStatus(id: string, status: StatusProjeto): Promise<
   const data = await ler<{ status: StatusProjeto }>(res, 'Não foi possível mudar o status.');
   return data.status;
 }
+
+// ---------- Lembrete de orçamentos parados ----------
+
+/** Orçamento enviado ao cliente e sem resposta há mais de N dias. */
+export type OrcamentoParado = {
+  id: string;
+  numero: number | null;
+  nome: string;
+  cliente: string;
+  cliente_nome: string;
+  cliente_celular: string;
+  enviado_em: string;
+  dias_parado: number;
+  ultimo_contato_em: string | null;
+  total: string;
+};
+
+export async function listarParados(): Promise<{ dias_lembrete: number; orcamentos: OrcamentoParado[] }> {
+  return ler(await apiFetch('/projetos/parados/'), 'Não foi possível carregar os lembretes.');
+}
+
+/** Esconde o lembrete por alguns dias. contatou = o cliente foi cobrado (ex: WhatsApp). */
+export async function adiarLembrete(id: string, dias: number, contatou = false): Promise<void> {
+  const res = await apiFetch(`/projetos/${id}/adiar-lembrete/`, {
+    method: 'POST',
+    body: JSON.stringify({ dias, contatou }),
+  });
+  await ler(res, 'Não foi possível adiar o lembrete.');
+}

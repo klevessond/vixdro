@@ -71,6 +71,28 @@ export default function Inicio() {
       </View>
 
       <View style={[styles.conteudo, { maxWidth: LARGURA_CONTEUDO }]}>
+        {!!painel?.projetos.parados && (
+          <Pressable
+            onPress={ir('/projetos/parados')}
+            accessibilityRole="button"
+            style={({ pressed }) => [styles.lembrete, pressed && { opacity: 0.9 }]}
+          >
+            <View style={styles.lembreteIcone}>
+              <MaterialCommunityIcons name="clock-alert-outline" size={24} color={cor.alerta} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.lembreteTitulo}>
+                {painel.projetos.parados}{' '}
+                {painel.projetos.parados === 1 ? 'orçamento aguardando resposta' : 'orçamentos aguardando resposta'}
+              </Text>
+              <Text style={styles.lembreteTexto}>
+                Enviados há mais de {painel.projetos.dias_lembrete} dias. Uma mensagem agora pode fechar a venda.
+              </Text>
+            </View>
+            <Text style={styles.lembreteAcao}>Ver ›</Text>
+          </Pressable>
+        )}
+
         <Text style={styles.grupo}>Atendimento</Text>
         <Grade colunas={colunas}>
           <Cartao
@@ -254,6 +276,18 @@ const styles = StyleSheet.create({
   empresa: { color: cor.textoSobreMarcaSuave, fontSize: 15, marginTop: 2 },
   sair: { padding: 8 },
   conteudo: { width: '100%', alignSelf: 'center', paddingHorizontal: espaco.sm },
+  lembrete: {
+    flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: cor.alertaFundo,
+    borderWidth: 1, borderColor: '#F0D9A8', borderRadius: raio.cartao, padding: espaco.lg,
+    marginHorizontal: espaco.sm, marginTop: espaco.xl,
+  },
+  lembreteIcone: {
+    width: 44, height: 44, borderRadius: 22, backgroundColor: '#FFFFFF',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  lembreteTitulo: { color: cor.texto, fontSize: 16, fontWeight: '800' },
+  lembreteTexto: { color: cor.alerta, fontSize: 13, marginTop: 2 },
+  lembreteAcao: { color: cor.alerta, fontSize: 15, fontWeight: '800' },
   grupo: { color: cor.texto, fontSize: 18, fontWeight: '800', marginTop: espaco.xl, marginBottom: espaco.xs, marginLeft: espaco.sm },
   grade: { flexDirection: 'row', flexWrap: 'wrap' },
   cartao: {

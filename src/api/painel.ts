@@ -6,7 +6,7 @@ import { ApiError, apiFetch } from './auth';
 
 export type Painel = {
   clientes: { total: number; novos_mes: number };
-  projetos: { ativos: number; aguardando_cliente: number };
+  projetos: { ativos: number; aguardando_cliente: number; parados: number; dias_lembrete: number };
   precos: { margem_padrao: string; itens_preco_novo: number; dias: number };
   produtos: number;
   meus_itens: number;

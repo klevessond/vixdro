@@ -11,6 +11,7 @@ export type PrecosPadrao = {
   mao_de_obra_minima_padrao: string;
   perda_padrao: string;
   validade_padrao: string | number;
+  dias_lembrete: string | number;
 };
 
 async function ler<T>(res: Response, padrao: string): Promise<T> {
