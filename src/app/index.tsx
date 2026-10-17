@@ -12,6 +12,7 @@ import { Href, useFocusEffect, useRouter } from 'expo-router';
 import { ComponentProps, ReactNode, useCallback, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
+import { diaRelativo, hora } from '@/api/agenda';
 import { Painel, obterPainel } from '@/api/painel';
 import { numero } from '@/api/produtos';
 import { useAuth } from '@/auth/AuthContext';
@@ -71,6 +72,42 @@ export default function Inicio() {
       </View>
 
       <View style={[styles.conteudo, { maxWidth: LARGURA_CONTEUDO }]}>
+        <Pressable
+          onPress={painel?.agenda.proximo ? ir(`/agenda/${painel.agenda.proximo.id}`) : ir('/agenda')}
+          style={({ pressed }) => [styles.agenda, pressed && { borderColor: cor.marca }]}
+          accessibilityRole="button"
+        >
+          <View style={styles.agendaIcone}>
+            <MaterialCommunityIcons name="calendar-clock" size={24} color={cor.marca} />
+          </View>
+          <View style={{ flex: 1 }}>
+            {painel?.agenda.proximo ? (
+              <>
+                <Text style={styles.agendaRotulo}>
+                  Próximo · {painel.agenda.hoje > 0 ? `${painel.agenda.hoje} hoje` : 'nenhum hoje'}
+                </Text>
+                <Text style={styles.agendaTitulo} numberOfLines={1}>
+                  {painel.agenda.proximo.tipo_texto} {diaRelativo(new Date(painel.agenda.proximo.inicio))}, às{' '}
+                  {hora(new Date(painel.agenda.proximo.inicio))}
+                  {painel.agenda.proximo.cliente_nome ? ` · ${painel.agenda.proximo.cliente_nome}` : ''}
+                </Text>
+                {!!painel.agenda.proximo.endereco && (
+                  <Text style={styles.agendaTexto} numberOfLines={1}>{painel.agenda.proximo.endereco}</Text>
+                )}
+              </>
+            ) : (
+              <>
+                <Text style={styles.agendaRotulo}>Agenda</Text>
+                <Text style={styles.agendaTitulo}>{painel ? 'Nenhum compromisso agendado' : '–'}</Text>
+                <Text style={styles.agendaTexto}>Medições, instalações e visitas.</Text>
+              </>
+            )}
+          </View>
+          <Pressable onPress={ir('/agenda')} hitSlop={8}>
+            <Text style={styles.agendaAcao}>Agenda ›</Text>
+          </Pressable>
+        </Pressable>
+
         {!!painel?.projetos.parados && (
           <Pressable
             onPress={ir('/projetos/parados')}
@@ -276,10 +313,23 @@ const styles = StyleSheet.create({
   empresa: { color: cor.textoSobreMarcaSuave, fontSize: 15, marginTop: 2 },
   sair: { padding: 8 },
   conteudo: { width: '100%', alignSelf: 'center', paddingHorizontal: espaco.sm },
+  agenda: {
+    flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: cor.cartao,
+    borderWidth: 1, borderColor: cor.borda, borderRadius: raio.cartao, padding: espaco.lg,
+    marginHorizontal: espaco.sm, marginTop: espaco.xl, ...sombra,
+  },
+  agendaIcone: {
+    width: 44, height: 44, borderRadius: 22, backgroundColor: cor.marcaClara,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  agendaRotulo: { color: cor.textoSuave, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  agendaTitulo: { color: cor.texto, fontSize: 16, fontWeight: '800', marginTop: 2 },
+  agendaTexto: { color: cor.textoSuave, fontSize: 13, marginTop: 1 },
+  agendaAcao: { color: cor.marca, fontSize: 15, fontWeight: '800' },
   lembrete: {
     flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: cor.alertaFundo,
     borderWidth: 1, borderColor: '#F0D9A8', borderRadius: raio.cartao, padding: espaco.lg,
-    marginHorizontal: espaco.sm, marginTop: espaco.xl,
+    marginHorizontal: espaco.sm, marginTop: espaco.md,
   },
   lembreteIcone: {
     width: 44, height: 44, borderRadius: 22, backgroundColor: '#FFFFFF',

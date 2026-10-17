@@ -8,6 +8,10 @@ export type Painel = {
   clientes: { total: number; novos_mes: number };
   projetos: { ativos: number; aguardando_cliente: number; parados: number; dias_lembrete: number };
   precos: { margem_padrao: string; itens_preco_novo: number; dias: number };
+  agenda: {
+    hoje: number;
+    proximo: { id: string; tipo: string; tipo_texto: string; inicio: string; cliente_nome: string | null; endereco: string } | null;
+  };
   produtos: number;
   meus_itens: number;
   empresa: { percentual: number; faltando: string[]; logo_url: string | null };

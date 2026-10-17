@@ -283,3 +283,8 @@ export async function adiarLembrete(id: string, dias: number, contatou = false):
   });
   await ler(res, 'Não foi possível adiar o lembrete.');
 }
+
+/** Projetos de um cliente (para ligar um compromisso da agenda ao projeto). */
+export async function listarProjetosDoCliente(clienteId: string): Promise<ProjetoResumo[]> {
+  return ler(await apiFetch(`/projetos/?cliente=${encodeURIComponent(clienteId)}`), 'Não foi possível carregar os projetos.');
+}

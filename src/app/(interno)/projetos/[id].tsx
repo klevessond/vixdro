@@ -426,6 +426,28 @@ export default function EditorProjeto() {
           </>
         )}
 
+        {jaExiste && !!projeto.cliente && (
+          <Pressable
+            style={styles.agendar}
+            onPress={() =>
+              router.push({
+                pathname: '/agenda/[id]',
+                params: {
+                  id: 'novo',
+                  cliente: projeto.cliente,
+                  projeto: projeto.id,
+                  // Aprovado: hora de instalar. Antes disso: medir.
+                  tipo: projeto.status === 'aprovado' ? 'instalacao' : 'medicao',
+                },
+              })
+            }
+          >
+            <Text style={styles.agendarTexto}>
+              {projeto.status === 'aprovado' ? '+ Agendar instalação' : '+ Agendar medição ou visita'}
+            </Text>
+          </Pressable>
+        )}
+
         {congelado && (
           <View style={styles.aviso}>
             <Text style={styles.avisoTexto}>
@@ -770,6 +792,11 @@ function LinhaInterna({ rotulo, valor }: { rotulo: string; valor: string }) {
 const styles = StyleSheet.create({
   tela: { flex: 1, backgroundColor: COR.fundo },
   grade: { flexDirection: 'row', gap: 12 },
+  agendar: {
+    borderWidth: 1, borderColor: COR.linha, borderStyle: 'dashed', borderRadius: 8,
+    paddingVertical: 11, alignItems: 'center', marginBottom: 12, backgroundColor: COR.superficie,
+  },
+  agendarTexto: { color: COR.borda, fontSize: 15, fontWeight: '700' },
   statusLinha: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
   statusChip: {
     borderWidth: 1, borderColor: COR.linha, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6,
