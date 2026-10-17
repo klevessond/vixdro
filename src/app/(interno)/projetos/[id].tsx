@@ -46,6 +46,7 @@ import { compartilharOrcamentoPdf } from '@/pdf/orcamentoPdf';
 import { COR } from '@/components/produtos/cores';
 import { AjustesOrcamento, ValoresAjuste } from '@/components/projetos/AjustesOrcamento';
 import { EditorPeca } from '@/components/projetos/EditorPeca';
+import { MedicaoProjeto } from '@/components/projetos/MedicaoProjeto';
 import { SeletorCliente } from '@/components/projetos/SeletorCliente';
 import { SeletorProduto } from '@/components/projetos/SeletorProduto';
 import { ClienteLocal, obterClienteLocal } from '@/storage/clientesRepository';
@@ -455,6 +456,9 @@ export default function EditorProjeto() {
             </Text>
           </View>
         )}
+
+        {/* Diário da medição: liberado mesmo com o projeto congelado (fotos da instalação). */}
+        {jaExiste && <MedicaoProjeto projetoId={projeto.id} pecas={projeto.linhas.map((l) => l.nome)} />}
 
         <Text style={styles.secao}>Peças</Text>
         <View style={styles.caixa}>
