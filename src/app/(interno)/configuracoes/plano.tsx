@@ -24,14 +24,14 @@ export default function MeuPlano() {
 
   function pedirPro() {
     if (!WHATSAPP_EQUIPE_VIXDRO) {
-      Alert.alert('Fale com a equipe vixdro', 'Entre em contato com a equipe vixdro para liberar o plano Pro na sua conta.');
+      Alert.alert('Fale com a equipe Orçaminio', 'Entre em contato com a equipe Orçaminio para liberar o plano Pro na sua conta.');
       return;
     }
     const msg =
       `Olá! Sou ${vidraceiro?.nome}${vidraceiro?.empresa ? `, da ${vidraceiro.empresa}` : ''} ` +
-      `(${vidraceiro?.email}) e quero conhecer o plano Pro do vixdro.`;
+      `(${vidraceiro?.email}) e quero conhecer o plano Pro do Orçaminio.`;
     abrirWhatsApp(WHATSAPP_EQUIPE_VIXDRO, msg).catch(() =>
-      Alert.alert('Não foi possível abrir o WhatsApp', 'Entre em contato com a equipe vixdro.')
+      Alert.alert('Não foi possível abrir o WhatsApp', 'Entre em contato com a equipe Orçaminio.')
     );
   }
 

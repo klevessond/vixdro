@@ -10,6 +10,7 @@ import {
   Image,
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -19,6 +20,8 @@ import {
 import {
   Fornecedor,
   ItemCatalogo,
+  TIPOS_ITEM,
+  TipoItem,
   buscarItens,
   comoEVendido,
   listarFornecedores,
@@ -39,6 +42,7 @@ export function SeletorItem({ visivel, onSelecionar, onFechar }: Props) {
   const [fornecedores, setFornecedores] = useState<Fornecedor[]>([]);
   const [fornecedor, setFornecedor] = useState<number | null>(null);
   const [busca, setBusca] = useState('');
+  const [tipo, setTipo] = useState<TipoItem | ''>('');
   const [itens, setItens] = useState<ItemCatalogo[]>([]);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -63,7 +67,7 @@ export function SeletorItem({ visivel, onSelecionar, onFechar }: Props) {
       setCarregando(true);
       setErro(null);
       try {
-        const resultado = await buscarItens(fornecedor, busca);
+        const resultado = await buscarItens(fornecedor, busca, tipo);
         if (id === ultimaBusca.current) setItens(resultado); // ignora respostas atrasadas
       } catch (e: any) {
         if (id === ultimaBusca.current) setErro(e?.message ?? 'Sem conexão com o servidor.');
@@ -72,7 +76,7 @@ export function SeletorItem({ visivel, onSelecionar, onFechar }: Props) {
       }
     }, 350);
     return () => clearTimeout(timer);
-  }, [busca, fornecedor, visivel]);
+  }, [busca, tipo, fornecedor, visivel]);
 
   return (
     <Modal visible={visivel} animationType="slide" presentationStyle="pageSheet" onRequestClose={onFechar}>
@@ -108,6 +112,18 @@ export function SeletorItem({ visivel, onSelecionar, onFechar }: Props) {
           autoFocus
           clearButtonMode="while-editing"
         />
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tipos} style={styles.tiposBarra}>
+          {TIPOS_ITEM.map((t) => (
+            <Pressable
+              key={t.valor || 'todos'}
+              onPress={() => setTipo(t.valor)}
+              style={[styles.tipo, tipo === t.valor && styles.tipoAtivo]}
+            >
+              <Text style={[styles.tipoTexto, tipo === t.valor && styles.tipoTextoAtivo]}>{t.rotulo}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
 
         <Pressable onPress={() => setNovoItemAberto(true)} style={styles.novoItem} hitSlop={6}>
           <Text style={styles.novoItemTexto}>+ Item que não está no catálogo (ex: vidro)</Text>
@@ -200,6 +216,15 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   erro: { color: COR.erro, fontSize: 14, marginHorizontal: 20, marginTop: 8 },
+  tipos: { gap: 8, paddingHorizontal: 20, paddingBottom: 8 },
+  tipo: {
+    borderWidth: 1, borderColor: COR.linha, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 6,
+    backgroundColor: COR.superficie,
+  },
+  tiposBarra: { flexGrow: 0, flexShrink: 0, minHeight: 44 },
+  tipoAtivo: { backgroundColor: COR.borda, borderColor: COR.borda },
+  tipoTexto: { color: COR.tinta, fontSize: 14, fontWeight: '600' },
+  tipoTextoAtivo: { color: '#FFFFFF' },
   novoItem: { marginHorizontal: 20, marginBottom: 6, paddingVertical: 6 },
   novoItemTexto: { color: COR.borda, fontSize: 14, fontWeight: '600' },
   vazio: { color: COR.tintaSuave, fontSize: 15, textAlign: 'center', marginTop: 32 },

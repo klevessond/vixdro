@@ -15,6 +15,7 @@ export type ItemCatalogo = {
   preco: string;
   estoque: string | null;
   ativo: boolean;
+  tipo?: TipoItem; // perfil, acessório, vidro, vedação ou outro
   imagem_url?: string | null; // enviada pela equipe no admin
   miniatura_url?: string | null;
 };
@@ -56,6 +57,9 @@ export type Produto = {
   descricao: string;
   componentes: Componente[];
   atualizado_em?: string;
+  // Calculados pelo servidor, só para leitura:
+  custo_referencia?: string; // custo dos itens numa peça de 1,00 x 1,00 m
+  custo_depende_medida?: boolean; // false = custo exato (só quantidades fixas)
 };
 
 export type LinhaSimulacao = {
@@ -127,9 +131,22 @@ export async function listarFornecedores(): Promise<Fornecedor[]> {
   return lerResposta(res, 'Não foi possível carregar os fornecedores.');
 }
 
-export async function buscarItens(fornecedor: number, busca: string): Promise<ItemCatalogo[]> {
+export type TipoItem = 'perfil' | 'acessorio' | 'vidro' | 'vedacao' | 'outro';
+
+/** Abas da busca do catálogo. */
+export const TIPOS_ITEM: { valor: TipoItem | ''; rotulo: string }[] = [
+  { valor: '', rotulo: 'Todos' },
+  { valor: 'perfil', rotulo: 'Perfis' },
+  { valor: 'acessorio', rotulo: 'Acessórios' },
+  { valor: 'vedacao', rotulo: 'Vedações' },
+  { valor: 'vidro', rotulo: 'Vidros' },
+  { valor: 'outro', rotulo: 'Outros' },
+];
+
+export async function buscarItens(fornecedor: number, busca: string, tipo: TipoItem | '' = ''): Promise<ItemCatalogo[]> {
   const params = new URLSearchParams({ fornecedor: String(fornecedor), tamanho: '50' });
   if (busca.trim()) params.set('busca', busca.trim());
+  if (tipo) params.set('tipo', tipo);
   const res = await apiFetch(`/catalogo/itens/?${params}`);
   const data = await lerResposta<{ itens: ItemCatalogo[] }>(res, 'Não foi possível buscar os itens.');
   return data.itens;
