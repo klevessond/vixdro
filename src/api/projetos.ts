@@ -8,6 +8,7 @@ import { ApiError, apiFetch } from './auth';
 import { Componente, Produto } from './produtos';
 
 export type Peca = {
+  id?: number; // definido pelo servidor (muda a cada salvamento do projeto)
   produto: string | null; // modelo de origem (só referência)
   nome: string;
   largura_mm: number;
@@ -15,6 +16,9 @@ export type Peca = {
   quantidade: number;
   observacao: string;
   itens: Componente[];
+  // Acompanhamento da obra: peça produzida/instalada.
+  concluida?: boolean;
+  concluida_em?: string | null;
 };
 
 /** Como o preço para o cliente é formado. Valores em texto, como vêm da API. */
@@ -55,6 +59,9 @@ export type Projeto = Precificacao & {
   cliente_nome?: string;
   observacoes: string;
   perda_percentual: string;
+  // Quanto de cada item sai do estoque: {"<id do item>": "1"}. Não muda o
+  // preço para o cliente; só o que é pedido ao fornecedor.
+  estoque_usado?: Record<string, string>;
   linhas: Peca[];
   atualizado_em?: string;
 };
@@ -67,6 +74,7 @@ export type ProjetoResumo = {
   cliente: string;
   cliente_nome: string;
   total_pecas: number | null;
+  pecas_concluidas: number | null;
   atualizado_em: string;
 };
 
@@ -79,6 +87,9 @@ export type ItemCompra = {
   consumo_total: string;
   comprimento_mm: number | null;
   quantidade_compra: string;
+  quantidade_estoque: string; // sai do estoque do vidraceiro
+  quantidade_pedir: string; // o que vai para o pedido ao fornecedor
+  custo_pedir: string;
   unidade_compra: string;
   sobra_m: string | null;
   preco_unitario: string;
@@ -170,6 +181,7 @@ function corpoProjeto(p: Projeto) {
     observacoes: p.observacoes,
     perda_percentual: p.perda_percentual || '0',
     ...precoParaEnvio(p),
+    estoque_usado: p.estoque_usado ?? {},
     linhas: p.linhas.map((l) => ({ ...l, itens: itensParaEnvio(l.itens) })),
   };
 }
@@ -237,6 +249,7 @@ export async function calcularProjeto(p: Projeto): Promise<CalculoProjeto> {
     body: JSON.stringify({
       perda_percentual: p.perda_percentual || '0',
       ...precoParaEnvio(p),
+      estoque_usado: p.estoque_usado ?? {},
       linhas: p.linhas.map((l) => ({
         nome: l.nome,
         largura_mm: l.largura_mm,
@@ -287,4 +300,17 @@ export async function adiarLembrete(id: string, dias: number, contatou = false):
 /** Projetos de um cliente (para ligar um compromisso da agenda ao projeto). */
 export async function listarProjetosDoCliente(clienteId: string): Promise<ProjetoResumo[]> {
   return ler(await apiFetch(`/projetos/?cliente=${encodeURIComponent(clienteId)}`), 'Não foi possível carregar os projetos.');
+}
+
+/** Marca uma peça como concluída (funciona mesmo com o projeto congelado). */
+export async function concluirPeca(
+  projetoId: string,
+  linhaId: number,
+  concluida: boolean
+): Promise<{ concluida: boolean; concluida_em: string | null; total_pecas: number; pecas_concluidas: number }> {
+  const res = await apiFetch(`/projetos/${projetoId}/concluir-peca/`, {
+    method: 'POST',
+    body: JSON.stringify({ linha: linhaId, concluida }),
+  });
+  return ler(res, 'Não foi possível atualizar a peça.');
 }

@@ -13,6 +13,7 @@ export type Painel = {
     hoje: number;
     proximo: { id: string; tipo: string; tipo_texto: string; inicio: string; cliente_nome: string | null; endereco: string } | null;
   };
+  financeiro: { disponivel: boolean; receber_mes?: string; vencidos?: number };
   plano: { plano: 'gratuito' | 'pro'; pro: boolean; validade: string | null; dias_restantes: number | null; expirado: boolean };
   produtos: number;
   meus_itens: number;

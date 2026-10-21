@@ -1,14 +1,18 @@
 // src/app/(interno)/projetos/index.tsx  ->  rota /projetos
+//
+// Projetos em cartões, com o cliente em destaque. A busca procura por nome
+// do projeto, nº do orçamento, nome/empresa, celular ou CPF/CNPJ do cliente.
 
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { ProjetoResumo, infoStatus, listarProjetos } from '@/api/projetos';
-import { COR } from '@/components/produtos/cores';
+import { LARGURA_FORMULARIO, cor, espaco, raio, sombra } from '@/ui/tema';
 
 function dataCurta(iso: string) {
-  return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
 }
 
 export default function ListaProjetos() {
@@ -40,7 +44,7 @@ export default function ListaProjetos() {
     }, [carregar])
   );
 
-  // Espera o vidraceiro parar de digitar antes de buscar.
+  // Espera parar de digitar antes de buscar.
   useEffect(() => {
     buscaAtual.current = busca;
     const timer = setTimeout(() => carregar(busca), 350);
@@ -50,94 +54,142 @@ export default function ListaProjetos() {
   return (
     <View style={styles.tela}>
       <Stack.Screen options={{ headerShown: true, title: 'Projetos' }} />
-      <TextInput
-        style={styles.busca}
-        value={busca}
-        onChangeText={setBusca}
-        placeholder="Nome, nº do orçamento, celular ou CPF/CNPJ"
-        placeholderTextColor={COR.tintaSuave}
-        autoCorrect={false}
-        clearButtonMode="while-editing"
-        returnKeyType="search"
-      />
+
+      <View style={styles.topo}>
+        <View style={styles.busca}>
+          <MaterialCommunityIcons name="magnify" size={20} color={cor.textoSuave} />
+          <TextInput
+            style={styles.buscaInput}
+            value={busca}
+            onChangeText={setBusca}
+            placeholder="Cliente, projeto, nº, celular ou CPF/CNPJ"
+            placeholderTextColor="#93A3A5"
+            autoCorrect={false}
+            returnKeyType="search"
+          />
+          {!!busca && (
+            <Pressable onPress={() => setBusca('')} hitSlop={8}>
+              <MaterialCommunityIcons name="close-circle" size={18} color={cor.textoSuave} />
+            </Pressable>
+          )}
+        </View>
+        <Pressable
+          style={({ pressed }) => [styles.novo, pressed && { backgroundColor: cor.marcaEscura }]}
+          onPress={() => router.push('/projetos/novo')}
+          accessibilityRole="button"
+        >
+          <MaterialCommunityIcons name="plus" size={20} color={cor.textoSobreMarca} />
+          <Text style={styles.novoTexto}>Novo</Text>
+        </Pressable>
+      </View>
+
       {carregando ? (
-        <ActivityIndicator style={{ marginTop: 40 }} color={COR.borda} />
+        <ActivityIndicator style={{ marginTop: 40 }} color={cor.marca} />
       ) : (
         <FlatList
           data={projetos}
           keyExtractor={(p) => p.id}
-          contentContainerStyle={{ paddingVertical: 8, flexGrow: 1 }}
-          ItemSeparatorComponent={() => <View style={styles.divisor} />}
-          ListHeaderComponent={erro ? <Text style={styles.erro}>{erro}</Text> : null}
+          contentContainerStyle={styles.lista}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
+          ListHeaderComponent={erro ? <Text style={styles.erro}>{erro}</Text> : null}
           ListEmptyComponent={
-            !erro && busca.trim() ? (
+            !erro ? (
               <View style={styles.vazio}>
-                <Text style={styles.vazioTitulo}>Nada encontrado</Text>
-                <Text style={styles.vazioTexto}>Nenhum projeto com "{busca.trim()}".</Text>
-              </View>
-            ) : !erro ? (
-              <View style={styles.vazio}>
-                <Text style={styles.vazioTitulo}>Nenhum projeto ainda</Text>
+                <MaterialCommunityIcons name="floor-plan" size={42} color={cor.textoSuave} />
+                <Text style={styles.vazioTitulo}>{busca.trim() ? 'Nada encontrado' : 'Nenhum projeto ainda'}</Text>
                 <Text style={styles.vazioTexto}>
-                  Escolha um cliente, adicione as janelas, portas e boxes com as medidas, e veja o
-                  custo e a lista de compra.
+                  {busca.trim()
+                    ? `Nenhum projeto com "${busca.trim()}".`
+                    : 'Escolha um cliente, adicione janelas, portas e boxes com as medidas, e gere o orçamento.'}
                 </Text>
               </View>
             ) : null
           }
-          renderItem={({ item: p }) => (
-            <Pressable
-              onPress={() => router.push(`/projetos/${p.id}`)}
-              style={({ pressed }) => [styles.linha, pressed && { backgroundColor: COR.bordaClara }]}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={styles.nome}>
-                  {p.numero ? <Text style={styles.numero}>nº {p.numero}  </Text> : null}
-                  {p.nome}
-                </Text>
-                <Text style={styles.detalhe}>
-                  {p.cliente_nome} · {p.total_pecas ?? 0} {p.total_pecas === 1 ? 'peça' : 'peças'} ·{' '}
-                  {dataCurta(p.atualizado_em)}
-                </Text>
-              </View>
-              <Text style={[styles.status, { color: infoStatus(p.status).cor }]}>{infoStatus(p.status).rotulo}</Text>
-              <Text style={styles.seta}>›</Text>
-            </Pressable>
-          )}
+          renderItem={({ item: p }) => {
+            const st = infoStatus(p.status);
+            const pecas = p.total_pecas ?? 0;
+            const feitas = p.pecas_concluidas ?? 0;
+            return (
+              <Pressable
+                onPress={() => router.push(`/projetos/${p.id}`)}
+                style={({ pressed }) => [styles.cartao, pressed && { borderColor: cor.marca }]}
+              >
+                <View style={styles.cartaoTopo}>
+                  {!!p.numero && <Text style={styles.numero}>Nº {p.numero}</Text>}
+                  <View style={[styles.etiqueta, { backgroundColor: st.cor + '1A' }]}>
+                    <Text style={[styles.etiquetaTexto, { color: st.cor }]}>{st.rotulo}</Text>
+                  </View>
+                </View>
+                <View style={styles.cliente}>
+                  <MaterialCommunityIcons name="account-outline" size={20} color={cor.marca} />
+                  <Text style={styles.clienteNome} numberOfLines={1}>{p.cliente_nome || 'Sem cliente'}</Text>
+                </View>
+                <Text style={styles.nome} numberOfLines={2}>{p.nome}</Text>
+                {feitas > 0 && pecas > 0 && (
+                  <View style={styles.progresso}>
+                    <View style={styles.progressoFundo}>
+                      <View style={[styles.progressoCheio, { width: `${(100 * feitas) / pecas}%` }]} />
+                    </View>
+                    <Text style={styles.progressoTexto}>
+                      {feitas === pecas ? 'concluído' : `${feitas}/${pecas} concluídas`}
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.rodape}>
+                  <Text style={styles.detalhe}>
+                    {pecas} {pecas === 1 ? 'peça' : 'peças'} · atualizado em {dataCurta(p.atualizado_em)}
+                  </Text>
+                  <MaterialCommunityIcons name="chevron-right" size={22} color={cor.textoSuave} />
+                </View>
+              </Pressable>
+            );
+          }}
         />
       )}
-      <View style={styles.rodape}>
-        <Pressable
-          style={({ pressed }) => [styles.botao, pressed && { backgroundColor: COR.bordaEscura }]}
-          onPress={() => router.push('/projetos/novo')}
-        >
-          <Text style={styles.botaoTexto}>Novo projeto</Text>
-        </Pressable>
-      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  tela: { flex: 1, backgroundColor: COR.fundo },
-  busca: {
-    margin: 16, marginBottom: 4, backgroundColor: COR.superficie, borderWidth: 1, borderColor: COR.linha,
-    borderRadius: 6, paddingHorizontal: 12, paddingVertical: 11, fontSize: 16, color: COR.tinta,
+  tela: { flex: 1, backgroundColor: cor.fundo },
+  topo: {
+    flexDirection: 'row', gap: espaco.sm, padding: espaco.lg, paddingBottom: espaco.sm,
+    width: '100%', maxWidth: LARGURA_FORMULARIO, alignSelf: 'center',
   },
-  divisor: { height: 1, backgroundColor: COR.linha, marginLeft: 20 },
-  linha: { flexDirection: 'row', alignItems: 'center', backgroundColor: COR.superficie, paddingHorizontal: 20, paddingVertical: 16 },
-  nome: { color: COR.tinta, fontSize: 17, fontWeight: '700' },
-  numero: { color: COR.tintaSuave, fontSize: 15, fontWeight: '600' },
-  detalhe: { color: COR.tintaSuave, fontSize: 14, marginTop: 2 },
-  seta: { color: COR.borda, fontSize: 28, fontWeight: '300', marginLeft: 8 },
-  status: { fontSize: 13, fontWeight: '700' },
-  erro: { color: COR.erro, fontSize: 14, padding: 20 },
-  vazio: { padding: 32, alignItems: 'center' },
-  vazioTitulo: { color: COR.tinta, fontSize: 18, fontWeight: '700' },
-  vazioTexto: { color: COR.tintaSuave, fontSize: 15, lineHeight: 22, textAlign: 'center', marginTop: 8 },
-  rodape: { padding: 16, paddingBottom: 32, borderTopWidth: 1, borderTopColor: COR.linha, backgroundColor: COR.fundo },
-  botao: { backgroundColor: COR.borda, borderRadius: 6, paddingVertical: 15, alignItems: 'center' },
-  botaoTexto: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  busca: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: cor.cartao,
+    borderWidth: 1, borderColor: cor.borda, borderRadius: raio.campo, paddingHorizontal: 12,
+  },
+  buscaInput: { flex: 1, paddingVertical: 11, fontSize: 15, color: cor.texto },
+  novo: {
+    flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: cor.marca,
+    borderRadius: raio.botao, paddingHorizontal: 14,
+  },
+  novoTexto: { color: cor.textoSobreMarca, fontSize: 15, fontWeight: '700' },
+  lista: { padding: espaco.lg, paddingTop: espaco.sm, gap: espaco.md, flexGrow: 1, width: '100%', maxWidth: LARGURA_FORMULARIO, alignSelf: 'center' },
+  cartao: {
+    backgroundColor: cor.cartao, borderRadius: raio.cartao, borderWidth: 1, borderColor: cor.borda,
+    padding: espaco.lg, ...sombra,
+  },
+  cartaoTopo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  numero: { color: cor.textoSuave, fontSize: 13, fontWeight: '700' },
+  etiqueta: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3, marginLeft: 'auto' },
+  etiquetaTexto: { fontSize: 12, fontWeight: '700' },
+  cliente: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  clienteNome: { color: cor.texto, fontSize: 18, fontWeight: '800', flexShrink: 1 },
+  nome: { color: cor.textoSuave, fontSize: 15, marginTop: 4 },
+  rodape: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    borderTopWidth: 1, borderTopColor: cor.borda, marginTop: espaco.md, paddingTop: espaco.sm,
+  },
+  detalhe: { color: cor.textoSuave, fontSize: 13 },
+  progresso: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
+  progressoFundo: { flex: 1, height: 6, borderRadius: 3, backgroundColor: cor.marcaClara, overflow: 'hidden' },
+  progressoCheio: { height: '100%', borderRadius: 3, backgroundColor: '#1E6B3A' },
+  progressoTexto: { color: cor.textoSuave, fontSize: 12, fontWeight: '600' },
+  erro: { color: cor.erro, fontSize: 14, marginBottom: espaco.sm },
+  vazio: { padding: espaco.xxl, alignItems: 'center', gap: 6 },
+  vazioTitulo: { color: cor.texto, fontSize: 18, fontWeight: '800' },
+  vazioTexto: { color: cor.textoSuave, fontSize: 15, lineHeight: 22, textAlign: 'center' },
 });

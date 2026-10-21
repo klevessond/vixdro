@@ -14,7 +14,7 @@ import { Image, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, Vi
 
 import { diaRelativo, hora } from '@/api/agenda';
 import { Painel, obterPainel } from '@/api/painel';
-import { numero } from '@/api/produtos';
+import { numero, reais } from '@/api/produtos';
 import { useAuth } from '@/auth/AuthContext';
 import { LARGURA_CONTEUDO, colunasPara, cor, espaco, raio, sombra } from '@/ui/tema';
 
@@ -239,6 +239,31 @@ export default function Inicio() {
           >
             <Barra percentual={painel?.empresa.percentual ?? 0} legenda={painel ? `${painel.empresa.percentual}%` : undefined} />
           </Cartao>
+        </Grade>
+
+        <Text style={styles.grupo}>Gestão</Text>
+        <Grade colunas={colunas}>
+          {painel?.financeiro.disponivel ? (
+            <Cartao
+              icone="cash-multiple"
+              titulo="Financeiro"
+              rotulo="A receber este mês"
+              valor={reais(painel.financeiro.receber_mes ?? '0')}
+              extra={painel.financeiro.vencidos ? { valor: String(painel.financeiro.vencidos), rotulo: 'recebimentos vencidos' } : undefined}
+              descricao="Contas a receber e a pagar, parcelas e o saldo do mês."
+              acao="Abrir"
+              onAcao={ir('/financeiro')}
+            />
+          ) : (
+            <Cartao
+              icone="cash-multiple"
+              titulo="Financeiro"
+              rotulo="Recurso do plano Pro"
+              descricao="Contas a receber e a pagar, parcelas e cobranças geradas a partir do orçamento."
+              acao="Conhecer"
+              onAcao={ir('/configuracoes/plano')}
+            />
+          )}
         </Grade>
       </View>
     </ScrollView>

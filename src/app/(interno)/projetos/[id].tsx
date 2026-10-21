@@ -5,6 +5,7 @@
 // com a lista de compra e o PDF do orçamento para compartilhar.
 
 import * as Crypto from 'expo-crypto';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
@@ -33,6 +34,7 @@ import {
   Projeto,
   arquivarProjeto,
   calcularProjeto,
+  concluirPeca,
   medidasTexto,
   pecaAvulsa,
   obterPadroes,
@@ -47,6 +49,7 @@ import { COR } from '@/components/produtos/cores';
 import { AjustesOrcamento, ValoresAjuste } from '@/components/projetos/AjustesOrcamento';
 import { EditorPeca } from '@/components/projetos/EditorPeca';
 import { MedicaoProjeto } from '@/components/projetos/MedicaoProjeto';
+import { RecebimentosProjeto } from '@/components/projetos/RecebimentosProjeto';
 import { usePlano } from '@/hooks/usePlano';
 import { SeletorCliente } from '@/components/projetos/SeletorCliente';
 import { SeletorProduto } from '@/components/projetos/SeletorProduto';
@@ -279,6 +282,50 @@ export default function EditorProjeto() {
     }
   }
 
+  // Ao mudar o que sai do estoque, a lista de compra se atualiza sozinha
+  // (espera parar de digitar).
+  useEffect(() => {
+    if (!calculo) return;
+    const t = setTimeout(() => {
+      calcularProjeto(projeto).then(setCalculo).catch(() => {});
+    }, 500);
+    return () => clearTimeout(t);
+  }, [projeto.estoque_usado]);
+
+  // Acompanhamento: conta pela quantidade (uma linha com 4 janelas vale 4).
+  const totalPecas = projeto.linhas.reduce((t, l) => t + (l.quantidade || 0), 0);
+  const pecasConcluidas = projeto.linhas.reduce((t, l) => t + (l.concluida ? l.quantidade || 0 : 0), 0);
+
+  async function alternarConcluida(indice: number) {
+    const peca = projeto.linhas[indice];
+    const concluida = !peca.concluida;
+    const atualizar = (c: boolean, em: string | null) =>
+      // Não marca o projeto como "alterado": isto já fica gravado na hora.
+      setProjeto((p) => ({
+        ...p,
+        linhas: p.linhas.map((l, j) => (j === indice ? { ...l, concluida: c, concluida_em: em } : l)),
+      }));
+    atualizar(concluida, concluida ? new Date().toISOString() : null);
+    // Peça ainda não salva: fica só na tela, e vai junto quando o projeto for salvo.
+    if (!jaExiste || peca.id === undefined) return;
+    try {
+      const r = await concluirPeca(projeto.id, peca.id, concluida);
+      atualizar(r.concluida, r.concluida_em);
+    } catch (e: any) {
+      atualizar(!!peca.concluida, peca.concluida_em ?? null); // desfaz
+      Alert.alert('Não foi possível atualizar a peça', e?.message ?? 'Tente novamente.');
+    }
+  }
+
+  function mudarEstoque(itemId: number, texto: string) {
+    const valor = texto.replace(/[^0-9,.]/g, '').replace(',', '.');
+    const atual = { ...(projeto.estoque_usado ?? {}) };
+    if (valor && Number(valor) > 0) atual[String(itemId)] = valor;
+    else delete atual[String(itemId)];
+    setProjeto((p) => ({ ...p, estoque_usado: atual }));
+    setAlterado(true);
+  }
+
   async function mudarStatus(status: StatusProjeto) {
     if (status === projeto.status) return;
     if (alterado || !jaExiste) {
@@ -464,6 +511,16 @@ export default function EditorProjeto() {
         {jaExiste && <MedicaoProjeto projetoId={projeto.id} pecas={projeto.linhas.map((l) => l.nome)} />}
 
         <Text style={styles.secao}>Peças</Text>
+        {totalPecas > 0 && jaExiste && (
+          <View style={styles.progresso}>
+            <View style={styles.progressoFundo}>
+              <View style={[styles.progressoCheio, { width: `${(100 * pecasConcluidas) / totalPecas}%` }]} />
+            </View>
+            <Text style={styles.progressoTexto}>
+              {pecasConcluidas === totalPecas ? 'Todas as peças concluídas' : `${pecasConcluidas} de ${totalPecas} peças concluídas`}
+            </Text>
+          </View>
+        )}
         <View style={styles.caixa}>
           {projeto.linhas.map((p, i) => (
             <View key={i}>
@@ -473,8 +530,21 @@ export default function EditorProjeto() {
                 disabled={congelado}
                 style={({ pressed }) => [styles.peca, pressed && { backgroundColor: COR.bordaClara }]}
               >
+                <Pressable
+                  onPress={() => alternarConcluida(i)}
+                  hitSlop={8}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: !!p.concluida }}
+                  accessibilityLabel={`${p.nome} concluída`}
+                >
+                  <MaterialCommunityIcons
+                    name={p.concluida ? 'check-circle' : 'checkbox-blank-circle-outline'}
+                    size={26}
+                    color={p.concluida ? '#1E6B3A' : COR.linha}
+                  />
+                </Pressable>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.pecaNome}>{p.nome}</Text>
+                  <Text style={[styles.pecaNome, p.concluida && styles.pecaConcluida]}>{p.nome}</Text>
                   <Text style={styles.pecaDetalhe}>
                     {[medidasTexto(p.largura_mm, p.altura_mm), `${p.itens.length} ${p.itens.length === 1 ? 'item' : 'itens'}`]
                       .filter(Boolean)
@@ -606,25 +676,46 @@ export default function EditorProjeto() {
 
             <Text style={styles.secao}>Lista de compra</Text>
             <View style={styles.caixaResultado}>
-              {calculo.lista_compra.map((x) => (
-                <View key={x.item} style={styles.resultadoLinha}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.resultadoNome}>{x.descricao}</Text>
-                    <Text style={styles.resultadoDetalhe}>
-                      {x.codigo} · {textoCompra(x)}
-                      {x.sobra_m !== null ? ` · sobra ${fmt(numero(x.sobra_m))} m` : ''}
-                      {!x.item_ativo ? ' · saiu de linha' : ''}
-                    </Text>
+              {calculo.lista_compra.map((x) => {
+                const doEstoque = numero(x.quantidade_estoque) > 0;
+                return (
+                  <View key={x.item} style={styles.compraItem}>
+                    <View style={styles.resultadoLinha}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.resultadoNome}>{x.descricao}</Text>
+                        <Text style={styles.resultadoDetalhe}>
+                          {x.codigo} · precisa de {textoCompra(x)}
+                          {x.sobra_m !== null ? ` · sobra ${fmt(numero(x.sobra_m))} m` : ''}
+                          {!x.item_ativo ? ' · saiu de linha' : ''}
+                        </Text>
+                      </View>
+                      <Text style={styles.resultadoValor}>{reais(x.custo_pedir)}</Text>
+                    </View>
+                    <View style={styles.estoqueLinha}>
+                      <Text style={styles.estoqueRotulo}>Do meu estoque:</Text>
+                      <TextInput
+                        style={styles.estoqueInput}
+                        value={projeto.estoque_usado?.[String(x.item)]?.replace('.', ',') ?? ''}
+                        onChangeText={(v) => mudarEstoque(x.item, v)}
+                        placeholder="0"
+                        placeholderTextColor="#93A3A5"
+                        keyboardType="decimal-pad"
+                        editable={!congelado}
+                      />
+                      <Text style={[styles.estoqueRotulo, { flex: 1 }]}>
+                        {doEstoque ? `→ pedir ${fmt(numero(x.quantidade_pedir), 3)}` : ''}
+                      </Text>
+                    </View>
                   </View>
-                  <Text style={styles.resultadoValor}>{reais(x.custo)}</Text>
-                </View>
-              ))}
+                );
+              })}
               <View style={styles.total}>
                 <Text style={styles.totalRotulo}>Total da compra</Text>
                 <Text style={styles.totalValor}>{reais(calculo.custo_compra)}</Text>
               </View>
               <Text style={styles.nota}>
-                Barras inteiras, somando todas as peças, com {fmt(numero(calculo.perda_percentual))}% de perda.
+                Barras inteiras, somando todas as peças, com {fmt(numero(calculo.perda_percentual))}% de perda. O que sai
+                do seu estoque não entra no pedido nem no total da compra, e não muda o preço para o cliente.
                 A diferença para os materiais é a sobra que fica no estoque.
               </Text>
             </View>
@@ -708,6 +799,10 @@ export default function EditorProjeto() {
               </Pressable>
             )}
           </>
+        )}
+
+        {jaExiste && projeto.linhas.length > 0 && (
+          <RecebimentosProjeto projetoId={projeto.id} pro={pro} total={calculo?.orcamento.total ?? null} />
         )}
 
         {jaExiste && !congelado && (
@@ -799,6 +894,18 @@ function LinhaInterna({ rotulo, valor }: { rotulo: string; valor: string }) {
 const styles = StyleSheet.create({
   tela: { flex: 1, backgroundColor: COR.fundo },
   grade: { flexDirection: 'row', gap: 12 },
+  pecaConcluida: { color: COR.tintaSuave, textDecorationLine: 'line-through' },
+  progresso: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  progressoFundo: { flex: 1, height: 8, borderRadius: 4, backgroundColor: COR.bordaClara, overflow: 'hidden' },
+  progressoCheio: { height: '100%', borderRadius: 4, backgroundColor: '#1E6B3A' },
+  progressoTexto: { color: COR.tintaSuave, fontSize: 13, fontWeight: '600' },
+  compraItem: { borderBottomWidth: 1, borderBottomColor: COR.bordaClara, paddingBottom: 6, marginBottom: 2 },
+  estoqueLinha: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  estoqueRotulo: { color: COR.tintaSuave, fontSize: 13 },
+  estoqueInput: {
+    borderWidth: 1, borderColor: COR.linha, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4,
+    minWidth: 54, textAlign: 'center', fontSize: 14, color: COR.tinta, backgroundColor: COR.superficie,
+  },
   agendar: {
     borderWidth: 1, borderColor: COR.linha, borderStyle: 'dashed', borderRadius: 8,
     paddingVertical: 11, alignItems: 'center', marginBottom: 12, backgroundColor: COR.superficie,
