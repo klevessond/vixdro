@@ -63,7 +63,17 @@ export default function Inicio() {
           )}
           <View style={{ flex: 1 }}>
             <Text style={styles.ola}>Olá, {primeiroNome(vidraceiro?.nome)}</Text>
-            {!!vidraceiro?.empresa && <Text style={styles.empresa}>{vidraceiro.empresa}</Text>}
+            <View style={styles.subLinha}>
+              {!!vidraceiro?.empresa && <Text style={styles.empresa}>{vidraceiro.empresa}</Text>}
+              {!!painel && (
+                <Pressable onPress={ir('/configuracoes/plano')} style={[styles.selo, painel.plano.pro && styles.seloPro]} hitSlop={6}>
+                  {painel.plano.pro && <MaterialCommunityIcons name="crown" size={12} color={cor.marca} />}
+                  <Text style={[styles.seloTexto, painel.plano.pro && { color: cor.marca }]}>
+                    {painel.plano.pro ? 'Pro' : 'Gratuito'}
+                  </Text>
+                </Pressable>
+              )}
+            </View>
           </View>
           <Pressable onPress={sair} hitSlop={10} accessibilityRole="button" accessibilityLabel="Sair da conta" style={styles.sair}>
             <MaterialCommunityIcons name="logout" size={22} color={cor.textoSobreMarca} />
@@ -72,6 +82,26 @@ export default function Inicio() {
       </View>
 
       <View style={[styles.conteudo, { maxWidth: LARGURA_CONTEUDO }]}>
+        {painel && !painel.agenda.disponivel ? (
+          <Pressable
+            onPress={ir('/configuracoes/plano')}
+            style={({ pressed }) => [styles.agenda, pressed && { borderColor: cor.marca }]}
+            accessibilityRole="button"
+          >
+            <View style={styles.agendaIcone}>
+              <MaterialCommunityIcons name="calendar-clock" size={24} color={cor.marca} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={styles.proLinha}>
+                <MaterialCommunityIcons name="crown" size={13} color={cor.marca} />
+                <Text style={styles.agendaRotulo}>Agenda · plano Pro</Text>
+              </View>
+              <Text style={styles.agendaTitulo}>Organize medições e instalações</Text>
+              <Text style={styles.agendaTexto}>Com o endereço no mapa e o aviso ao cliente pelo WhatsApp.</Text>
+            </View>
+            <Text style={styles.agendaAcao}>Conhecer ›</Text>
+          </Pressable>
+        ) : (
         <Pressable
           onPress={painel?.agenda.proximo ? ir(`/agenda/${painel.agenda.proximo.id}`) : ir('/agenda')}
           style={({ pressed }) => [styles.agenda, pressed && { borderColor: cor.marca }]}
@@ -107,6 +137,7 @@ export default function Inicio() {
             <Text style={styles.agendaAcao}>Agenda ›</Text>
           </Pressable>
         </Pressable>
+        )}
 
         {!!painel?.projetos.parados && (
           <Pressable
@@ -310,7 +341,14 @@ const styles = StyleSheet.create({
   },
   avatarTexto: { color: cor.marca, fontSize: 19, fontWeight: '800' },
   ola: { color: cor.textoSobreMarca, fontSize: 28, fontWeight: '800', letterSpacing: -0.6 },
-  empresa: { color: cor.textoSobreMarcaSuave, fontSize: 15, marginTop: 2 },
+  empresa: { color: cor.textoSobreMarcaSuave, fontSize: 15 },
+  subLinha: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 2 },
+  selo: {
+    flexDirection: 'row', alignItems: 'center', gap: 3, borderWidth: 1, borderColor: cor.textoSobreMarcaSuave,
+    borderRadius: 999, paddingHorizontal: 8, paddingVertical: 1,
+  },
+  seloPro: { backgroundColor: '#FFFFFF', borderColor: '#FFFFFF' },
+  seloTexto: { color: cor.textoSobreMarcaSuave, fontSize: 12, fontWeight: '700' },
   sair: { padding: 8 },
   conteudo: { width: '100%', alignSelf: 'center', paddingHorizontal: espaco.sm },
   agenda: {
@@ -325,6 +363,7 @@ const styles = StyleSheet.create({
   agendaRotulo: { color: cor.textoSuave, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
   agendaTitulo: { color: cor.texto, fontSize: 16, fontWeight: '800', marginTop: 2 },
   agendaTexto: { color: cor.textoSuave, fontSize: 13, marginTop: 1 },
+  proLinha: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   agendaAcao: { color: cor.marca, fontSize: 15, fontWeight: '800' },
   lembrete: {
     flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: cor.alertaFundo,

@@ -27,6 +27,7 @@ import {
   salvarCompromisso,
 } from '@/api/agenda';
 import { ProjetoResumo, listarProjetosDoCliente } from '@/api/projetos';
+import { SomentePro } from '@/components/plano/SomentePro';
 import { SeletorCliente } from '@/components/projetos/SeletorCliente';
 import { ClienteLocal, obterClienteLocal } from '@/storage/clientesRepository';
 import { LARGURA_FORMULARIO, cor, espaco, raio, sombra } from '@/ui/tema';
@@ -59,7 +60,21 @@ function montarData(data: string, hora: string): Date | null {
 
 type ClienteEscolhido = { id: string; nome: string };
 
-export default function EditarCompromisso() {
+export default function TelaCompromisso() {
+  return (
+    <View style={styles.tela}>
+      <Stack.Screen options={{ headerShown: true, title: 'Agenda' }} />
+      <SomentePro
+        recurso="A agenda"
+        descricao="Organize medições, instalações e visitas, abra o endereço no mapa e avise o cliente pelo WhatsApp."
+      >
+        <EditarCompromisso />
+      </SomentePro>
+    </View>
+  );
+}
+
+function EditarCompromisso() {
   const params = useLocalSearchParams<{ id: string; data?: string; cliente?: string; projeto?: string; tipo?: string }>();
   const router = useRouter();
   const novo = params.id === 'novo';

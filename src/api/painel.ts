@@ -9,9 +9,11 @@ export type Painel = {
   projetos: { ativos: number; aguardando_cliente: number; parados: number; dias_lembrete: number };
   precos: { margem_padrao: string; itens_preco_novo: number; dias: number };
   agenda: {
+    disponivel: boolean; // false = conta sem o Pro (a agenda é do Pro)
     hoje: number;
     proximo: { id: string; tipo: string; tipo_texto: string; inicio: string; cliente_nome: string | null; endereco: string } | null;
   };
+  plano: { plano: 'gratuito' | 'pro'; pro: boolean; validade: string | null; dias_restantes: number | null; expirado: boolean };
   produtos: number;
   meus_itens: number;
   empresa: { percentual: number; faltando: string[]; logo_url: string | null };

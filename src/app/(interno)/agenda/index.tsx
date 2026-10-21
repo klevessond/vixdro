@@ -20,6 +20,7 @@ import {
   nomeDiaCurto,
 } from '@/api/agenda';
 import { useAuth } from '@/auth/AuthContext';
+import { SomentePro } from '@/components/plano/SomentePro';
 import { LARGURA_FORMULARIO, cor, espaco, raio, sombra } from '@/ui/tema';
 import { abrirMapa, abrirWhatsApp, numeroWhatsApp } from '@/util/contato';
 
@@ -39,7 +40,20 @@ function somarDias(d: Date, n: number): Date {
 
 const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 
-export default function Agenda() {
+const DESCRICAO_PRO = 'Organize medições, instalações e visitas, abra o endereço no mapa e avise o cliente pelo WhatsApp.';
+
+export default function TelaAgenda() {
+  return (
+    <View style={styles.tela}>
+      <Stack.Screen options={{ headerShown: true, title: 'Agenda' }} />
+      <SomentePro recurso="A agenda" descricao={DESCRICAO_PRO}>
+        <Agenda />
+      </SomentePro>
+    </View>
+  );
+}
+
+function Agenda() {
   const router = useRouter();
   const { vidraceiro } = useAuth();
   const [selecionado, setSelecionado] = useState(() => new Date());

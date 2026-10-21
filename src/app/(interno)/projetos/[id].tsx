@@ -47,6 +47,7 @@ import { COR } from '@/components/produtos/cores';
 import { AjustesOrcamento, ValoresAjuste } from '@/components/projetos/AjustesOrcamento';
 import { EditorPeca } from '@/components/projetos/EditorPeca';
 import { MedicaoProjeto } from '@/components/projetos/MedicaoProjeto';
+import { usePlano } from '@/hooks/usePlano';
 import { SeletorCliente } from '@/components/projetos/SeletorCliente';
 import { SeletorProduto } from '@/components/projetos/SeletorProduto';
 import { ClienteLocal, obterClienteLocal } from '@/storage/clientesRepository';
@@ -111,6 +112,7 @@ export default function EditorProjeto() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { vidraceiro } = useAuth();
+  const { pro } = usePlano(); // a agenda é do plano Pro
   const novo = id === 'novo';
 
   const [projeto, setProjeto] = useState<Projeto>(novoProjeto);
@@ -445,6 +447,7 @@ export default function EditorProjeto() {
           >
             <Text style={styles.agendarTexto}>
               {projeto.status === 'aprovado' ? '+ Agendar instalação' : '+ Agendar medição ou visita'}
+              {!pro ? '  ·  Pro' : ''}
             </Text>
           </Pressable>
         )}
