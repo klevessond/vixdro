@@ -35,6 +35,7 @@ import {
   simular,
   duplicarProduto,
 } from '@/api/produtos';
+import { useAuth } from '@/auth/AuthContext';
 import { EditorRegra } from '@/components/produtos/EditorRegra';
 import { SeletorItem } from '@/components/produtos/SeletorItem';
 import { COR } from '@/components/produtos/cores';
@@ -121,8 +122,11 @@ export default function EditorProduto() {
     }
   }
 
-  // Modelo pronto (da equipe): só leitura; o vidraceiro cria a própria versão.
-  const modelo = !!produto.padrao;
+  // Modelo pronto: só leitura para o vidraceiro (ele cria a própria versão).
+  // A equipe do Orçaminio edita os modelos aqui mesmo, e marca/desmarca o modelo.
+  const { vidraceiro } = useAuth();
+  const equipe = !!vidraceiro?.equipe;
+  const modelo = !!produto.padrao && !equipe;
   const [duplicando, setDuplicando] = useState(false);
 
   async function criarMinhaVersao() {
@@ -203,6 +207,30 @@ export default function EditorProduto() {
             >
               {duplicando ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.modeloBotaoTexto}>Criar minha versão</Text>}
             </Pressable>
+          </View>
+        )}
+
+        {equipe && (
+          <View style={[styles.equipe, produto.padrao && styles.equipeAtivo]}>
+            <Pressable
+              style={styles.equipeLinha}
+              onPress={() => alterar({ padrao: !produto.padrao })}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: !!produto.padrao }}
+            >
+              <View style={[styles.caixaMarcar, produto.padrao && styles.caixaMarcada]}>
+                {produto.padrao && <Text style={styles.marcado}>✓</Text>}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.equipeTitulo}>Modelo pronto</Text>
+                <Text style={styles.equipeTexto}>
+                  {produto.padrao
+                    ? 'Aparece para todos os vidraceiros. As mudanças salvas aqui valem para todos.'
+                    : 'Marque para publicar este produto como modelo para todos os vidraceiros.'}
+                </Text>
+              </View>
+            </Pressable>
+            <Text style={styles.equipeNota}>Opção visível só para a equipe do Orçaminio. Use só itens do catálogo do fornecedor.</Text>
           </View>
         )}
 
@@ -358,6 +386,18 @@ export default function EditorProduto() {
 }
 
 const styles = StyleSheet.create({
+  equipe: { borderWidth: 1, borderColor: '#C9DCD8', borderRadius: 12, padding: 14, marginBottom: 20, backgroundColor: '#FFFFFF' },
+  equipeAtivo: { borderColor: '#1E5B57', borderWidth: 2, backgroundColor: '#E6EFED' },
+  equipeLinha: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
+  caixaMarcar: {
+    width: 24, height: 24, borderRadius: 6, borderWidth: 2, borderColor: '#1E5B57',
+    alignItems: 'center', justifyContent: 'center', marginTop: 1,
+  },
+  caixaMarcada: { backgroundColor: '#1E5B57' },
+  marcado: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
+  equipeTitulo: { color: '#16292B', fontSize: 16, fontWeight: '800' },
+  equipeTexto: { color: '#16292B', fontSize: 14, lineHeight: 20, marginTop: 2 },
+  equipeNota: { color: '#5B6F71', fontSize: 12, marginTop: 10 },
   modelo: {
     backgroundColor: '#E6EFED', borderRadius: 12, padding: 16, marginBottom: 20, gap: 8,
     borderWidth: 1, borderColor: '#C9DCD8',

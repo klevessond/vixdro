@@ -176,6 +176,7 @@ export async function salvarProduto(p: Produto): Promise<Produto> {
     nome: p.nome,
     categoria: p.categoria,
     descricao: p.descricao,
+    padrao: !!p.padrao, // só tem efeito para contas da equipe (o servidor confere)
     componentes: p.componentes.map(paraEnvio),
   });
   const res = p.id
