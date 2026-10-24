@@ -1,4 +1,4 @@
-\xef\xbb\xbf# publicar-site.ps1
+# publicar-site.ps1
 #
 # Gera o site do Orçaminio e publica no servidor, com conferências antes de
 # enviar. Fica na raiz do projeto do app (ao lado do package.json).
