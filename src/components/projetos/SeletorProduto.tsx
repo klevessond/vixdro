@@ -64,7 +64,10 @@ export function SeletorProduto({ visivel, onSelecionar, onAvulsa, onFechar }: Pr
               onPress={() => onSelecionar(p)}
               style={({ pressed }) => [styles.linha, pressed && { backgroundColor: COR.bordaClara }]}
             >
-              <Text style={styles.nome}>{p.nome}</Text>
+              <Text style={styles.nome}>
+                {p.nome}
+                {p.padrao ? <Text style={styles.modelo}>  · modelo pronto</Text> : null}
+              </Text>
               <Text style={styles.detalhe}>
                 {ROTULO[p.categoria]} · {p.componentes.length} {p.componentes.length === 1 ? 'item' : 'itens'}
               </Text>
@@ -77,6 +80,7 @@ export function SeletorProduto({ visivel, onSelecionar, onAvulsa, onFechar }: Pr
 }
 
 const styles = StyleSheet.create({
+  modelo: { color: '#1E5B57', fontSize: 13, fontWeight: '600' },
   tela: { flex: 1, backgroundColor: COR.fundo, paddingTop: 20 },
   topo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 12 },
   titulo: { color: COR.tinta, fontSize: 20, fontWeight: '700' },

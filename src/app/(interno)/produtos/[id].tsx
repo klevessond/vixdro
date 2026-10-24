@@ -33,6 +33,7 @@ import {
   resumoRegra,
   salvarProduto,
   simular,
+  duplicarProduto,
 } from '@/api/produtos';
 import { EditorRegra } from '@/components/produtos/EditorRegra';
 import { SeletorItem } from '@/components/produtos/SeletorItem';
@@ -120,6 +121,22 @@ export default function EditorProduto() {
     }
   }
 
+  // Modelo pronto (da equipe): só leitura; o vidraceiro cria a própria versão.
+  const modelo = !!produto.padrao;
+  const [duplicando, setDuplicando] = useState(false);
+
+  async function criarMinhaVersao() {
+    setDuplicando(true);
+    try {
+      const copia = await duplicarProduto(produto.id!);
+      router.replace(`/produtos/${copia.id}`);
+    } catch (e: any) {
+      Alert.alert('Não foi possível criar a cópia', e?.message ?? 'Tente novamente.');
+    } finally {
+      setDuplicando(false);
+    }
+  }
+
   async function salvar() {
     if (!produto.nome.trim()) {
       Alert.alert('Falta o nome', 'Dê um nome ao produto, ex: Janela veneziana 2 folhas.');
@@ -169,12 +186,31 @@ export default function EditorProduto() {
 
   return (
     <KeyboardAvoidingView style={styles.tela} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Stack.Screen options={{ headerShown: true, title: novo ? 'Novo produto' : 'Editar produto' }} />
+      <Stack.Screen options={{ headerShown: true, title: modelo ? 'Modelo pronto' : novo ? 'Novo produto' : 'Editar produto' }} />
       <ScrollView contentContainerStyle={styles.conteudo} keyboardShouldPersistTaps="handled">
+        {modelo && (
+          <View style={styles.modelo}>
+            <Text style={styles.modeloTitulo}>Modelo pronto do Orçaminio</Text>
+            <Text style={styles.modeloTexto}>
+              Use nos projetos como está: lá, as peças podem ser ajustadas à vontade. Para mudar o modelo em si
+              (outro puxador, outra vedação), crie a sua versão.
+            </Text>
+            <Pressable
+              style={({ pressed }) => [styles.modeloBotao, (pressed || duplicando) && { opacity: 0.8 }]}
+              onPress={criarMinhaVersao}
+              disabled={duplicando}
+              accessibilityRole="button"
+            >
+              {duplicando ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.modeloBotaoTexto}>Criar minha versão</Text>}
+            </Pressable>
+          </View>
+        )}
+
         <Text style={styles.rotulo}>Nome</Text>
         <TextInput
           style={styles.input}
           value={produto.nome}
+          editable={!modelo}
           onChangeText={(nome) => alterar({ nome })}
           placeholder="Ex: Janela veneziana 2 folhas"
           placeholderTextColor={COR.tintaSuave}
@@ -186,6 +222,7 @@ export default function EditorProduto() {
             <Pressable
               key={c.valor}
               onPress={() => alterar({ categoria: c.valor })}
+              disabled={modelo}
               style={[styles.chip, produto.categoria === c.valor && styles.chipAtivo]}
             >
               <Text style={[styles.chipTexto, produto.categoria === c.valor && styles.chipTextoAtivo]}>
@@ -196,13 +233,14 @@ export default function EditorProduto() {
         </View>
 
         <Text style={styles.secao}>Itens</Text>
-        <Text style={styles.ajuda}>Toque num item para mudar quanto ele usa em cada peça.</Text>
+        {!modelo && <Text style={styles.ajuda}>Toque num item para mudar quanto ele usa em cada peça.</Text>}
         <View style={styles.caixa}>
           {produto.componentes.map((c, i) => (
             <View key={`${c.item}-${i}`}>
               {i > 0 && <View style={styles.divisor} />}
               <Pressable
                 onPress={() => setEdicao({ indice: i, componente: c })}
+                disabled={modelo}
                 style={({ pressed }) => [styles.componente, pressed && { backgroundColor: COR.bordaClara }]}
               >
                 <View style={{ flex: 1 }}>
@@ -217,14 +255,18 @@ export default function EditorProduto() {
               </Pressable>
             </View>
           ))}
-          {produto.componentes.length > 0 && <View style={styles.divisor} />}
-          <Pressable
-            onPress={() => setSeletorAberto(true)}
-            style={({ pressed }) => [styles.adicionar, pressed && { backgroundColor: COR.bordaClara }]}
-            accessibilityRole="button"
-          >
-            <Text style={styles.adicionarTexto}>+ Adicionar item do catálogo</Text>
-          </Pressable>
+          {!modelo && (
+            <>
+              {produto.componentes.length > 0 && <View style={styles.divisor} />}
+              <Pressable
+                onPress={() => setSeletorAberto(true)}
+                style={({ pressed }) => [styles.adicionar, pressed && { backgroundColor: COR.bordaClara }]}
+                accessibilityRole="button"
+              >
+                <Text style={styles.adicionarTexto}>+ Adicionar item do catálogo</Text>
+              </Pressable>
+            </>
+          )}
         </View>
 
         {produto.componentes.length > 0 && (
@@ -286,15 +328,17 @@ export default function EditorProduto() {
           </>
         )}
 
-        <Pressable
-          style={({ pressed }) => [styles.botao, (pressed || salvando) && { backgroundColor: COR.bordaEscura }]}
-          onPress={salvar}
-          disabled={salvando}
-          accessibilityRole="button"
-        >
-          {salvando ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.botaoTexto}>Salvar produto</Text>}
-        </Pressable>
-        {!novo && (
+        {!modelo && (
+          <Pressable
+            style={({ pressed }) => [styles.botao, (pressed || salvando) && { backgroundColor: COR.bordaEscura }]}
+            onPress={salvar}
+            disabled={salvando}
+            accessibilityRole="button"
+          >
+            {salvando ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.botaoTexto}>Salvar produto</Text>}
+          </Pressable>
+        )}
+        {!novo && !modelo && (
           <Pressable style={styles.excluir} onPress={excluir} accessibilityRole="button">
             <Text style={styles.excluirTexto}>Excluir produto</Text>
           </Pressable>
@@ -314,6 +358,14 @@ export default function EditorProduto() {
 }
 
 const styles = StyleSheet.create({
+  modelo: {
+    backgroundColor: '#E6EFED', borderRadius: 12, padding: 16, marginBottom: 20, gap: 8,
+    borderWidth: 1, borderColor: '#C9DCD8',
+  },
+  modeloTitulo: { color: '#1E5B57', fontSize: 16, fontWeight: '800' },
+  modeloTexto: { color: '#16292B', fontSize: 14, lineHeight: 20 },
+  modeloBotao: { backgroundColor: '#1E5B57', borderRadius: 8, paddingVertical: 12, alignItems: 'center', marginTop: 4 },
+  modeloBotaoTexto: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
   tela: { flex: 1, backgroundColor: COR.fundo },
   conteudo: { padding: 20, paddingBottom: 48 },
   rotulo: { color: COR.tinta, fontSize: 14, fontWeight: '600', marginBottom: 6, marginTop: 4 },

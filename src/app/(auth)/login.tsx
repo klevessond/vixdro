@@ -77,7 +77,7 @@ export default function LoginScreen() {
     >
       <ScrollView contentContainerStyle={styles.conteudo} keyboardShouldPersistTaps="handled">
         <View style={styles.cabecalho}>
-          <Text style={styles.marca}>vixdro</Text>
+          <Text style={styles.marca}>Orçaminio</Text>
           <Text style={styles.subtitulo}>Orçamentos com seus fornecedores de vidro</Text>
         </View>
         {/* Corte diagonal, como a aresta de uma chapa */}
