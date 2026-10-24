@@ -11,6 +11,8 @@
       "icon": "./assets/expo.icon"
     },
     "android": {
+      "package": "br.com.orcaminio.app",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -37,7 +39,14 @@
       ],
       "expo-sqlite",
       "expo-secure-store",
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "O Orçaminio usa a câmera para fotografar o vão na medição.",
+          "photosPermission": "O Orçaminio usa suas fotos para anexar à medição e para a logomarca."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
