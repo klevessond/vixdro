@@ -49,6 +49,7 @@ import { COR } from '@/components/produtos/cores';
 import { AjustesOrcamento, ValoresAjuste } from '@/components/projetos/AjustesOrcamento';
 import { EditorPeca } from '@/components/projetos/EditorPeca';
 import { MedicaoProjeto } from '@/components/projetos/MedicaoProjeto';
+import { Condicao, listarCondicoes } from '@/api/financeiro';
 import { RecebimentosProjeto } from '@/components/projetos/RecebimentosProjeto';
 import { usePlano } from '@/hooks/usePlano';
 import { SeletorCliente } from '@/components/projetos/SeletorCliente';
@@ -112,10 +113,17 @@ function textoCompra(x: ItemCompra) {
 type EdicaoPeca = { indice: number | null; peca: Peca };
 
 export default function EditorProjeto() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, cobrancas } = useLocalSearchParams<{ id: string; cobrancas?: string }>();
   const router = useRouter();
   const { vidraceiro } = useAuth();
-  const { pro } = usePlano(); // a agenda é do plano Pro
+  const { pro } = usePlano(); // a agenda e o financeiro são do plano Pro
+  const [condicoes, setCondicoes] = useState<Condicao[]>([]);
+  // Muda de valor para abrir a geração das contas a receber (ex: logo após aprovar).
+  const [pedirGeracao, setPedirGeracao] = useState(cobrancas ? 1 : 0);
+
+  useEffect(() => {
+    listarCondicoes().then(setCondicoes).catch(() => {});
+  }, []);
   const novo = id === 'novo';
 
   const [projeto, setProjeto] = useState<Projeto>(novoProjeto);
@@ -335,6 +343,7 @@ export default function EditorProjeto() {
     try {
       const novoStatus = await alterarStatus(projeto.id, status);
       setProjeto((p) => ({ ...p, status: novoStatus }));
+      if (novoStatus === 'aprovado' && pro) setPedirGeracao((n) => n + 1); // oferece gerar as contas a receber
     } catch (e: any) {
       Alert.alert('Não foi possível mudar o status', e?.message ?? 'Tente novamente.');
     }
@@ -359,6 +368,7 @@ export default function EditorProjeto() {
               const status = await alterarStatus(projeto.id, 'aprovado');
               setProjeto((p) => ({ ...p, status }));
               await fazerPedido();
+              if (pro) setPedirGeracao((n) => n + 1);
             } catch (e: any) {
               Alert.alert('Não foi possível enviar', e?.message ?? 'Tente novamente.');
             }
@@ -571,6 +581,30 @@ export default function EditorProjeto() {
         {projeto.linhas.length > 0 && (
           <>
             <Text style={styles.secao}>Condições do orçamento</Text>
+            {condicoes.length > 0 && (
+              <>
+                <Text style={styles.rotulo}>Forma de pagamento combinada</Text>
+                <View style={styles.formas}>
+                  {condicoes.map((c) => {
+                    const ativa = projeto.condicao_pagamento === c.id;
+                    return (
+                      <Pressable
+                        key={c.id}
+                        onPress={() => alterar({ condicao_pagamento: ativa ? null : c.id })}
+                        disabled={congelado}
+                        style={[styles.forma, ativa && styles.formaAtiva]}
+                      >
+                        <Text style={[styles.formaTexto, ativa && { color: '#FFFFFF' }]}>{c.nome}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                <Text style={styles.formaNota}>
+                  O PDF mostra todas as formas, com os valores; a combinada aparece marcada. Cadastre e edite em Preços e
+                  margem › Formas de pagamento.
+                </Text>
+              </>
+            )}
             <View style={styles.grade}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.rotulo}>Valor adicional</Text>
@@ -802,7 +836,15 @@ export default function EditorProjeto() {
         )}
 
         {jaExiste && projeto.linhas.length > 0 && (
-          <RecebimentosProjeto projetoId={projeto.id} pro={pro} total={calculo?.orcamento.total ?? null} />
+          <RecebimentosProjeto
+            projetoId={projeto.id}
+            pro={pro}
+            total={calculo?.orcamento.total ?? null}
+            condicaoCombinada={projeto.condicao_pagamento}
+            pedirGeracao={pedirGeracao}
+            // A geração grava a condição no servidor; aqui só atualiza a tela.
+            onCondicaoDefinida={(c) => setProjeto((p) => ({ ...p, condicao_pagamento: c }))}
+          />
         )}
 
         {jaExiste && !congelado && (
@@ -894,6 +936,11 @@ function LinhaInterna({ rotulo, valor }: { rotulo: string; valor: string }) {
 const styles = StyleSheet.create({
   tela: { flex: 1, backgroundColor: COR.fundo },
   grade: { flexDirection: 'row', gap: 12 },
+  formas: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 6 },
+  forma: { borderWidth: 1, borderColor: COR.linha, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: COR.superficie },
+  formaAtiva: { backgroundColor: COR.borda, borderColor: COR.borda },
+  formaTexto: { color: COR.tinta, fontSize: 14, fontWeight: '600' },
+  formaNota: { color: COR.tintaSuave, fontSize: 12, marginBottom: 14 },
   pecaConcluida: { color: COR.tintaSuave, textDecorationLine: 'line-through' },
   progresso: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
   progressoFundo: { flex: 1, height: 8, borderRadius: 4, backgroundColor: COR.bordaClara, overflow: 'hidden' },

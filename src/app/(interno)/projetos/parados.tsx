@@ -12,6 +12,7 @@ import { ActivityIndicator, Alert, FlatList, Linking, Pressable, StyleSheet, Tex
 import { reais } from '@/api/produtos';
 import { OrcamentoParado, adiarLembrete, alterarStatus, listarParados } from '@/api/projetos';
 import { useAuth } from '@/auth/AuthContext';
+import { usePlano } from '@/hooks/usePlano';
 import { LARGURA_FORMULARIO, cor, espaco, raio, sombra } from '@/ui/tema';
 
 // Depois de cobrar, o lembrete volta só depois destes dias.
@@ -37,6 +38,7 @@ function numeroWhatsApp(celular: string): string | null {
 
 export default function OrcamentosParados() {
   const router = useRouter();
+  const { pro } = usePlano();
   const { vidraceiro } = useAuth();
   const [lista, setLista] = useState<OrcamentoParado[]>([]);
   const [dias, setDias] = useState(5);
@@ -104,6 +106,13 @@ export default function OrcamentosParados() {
           try {
             await alterarStatus(o.id, status);
             tirarDaLista(o.id);
+            // Aprovado: oferece gerar as contas a receber (Pro), abrindo o projeto.
+            if (status === 'aprovado' && pro) {
+              Alert.alert('Orçamento aprovado', 'Gerar as contas a receber agora?', [
+                { text: 'Depois', style: 'cancel' },
+                { text: 'Gerar', onPress: () => router.push({ pathname: '/projetos/[id]', params: { id: o.id, cobrancas: '1' } }) },
+              ]);
+            }
           } catch (e: any) {
             Alert.alert('Não foi possível mudar a situação', e?.message ?? 'Tente novamente.');
           } finally {

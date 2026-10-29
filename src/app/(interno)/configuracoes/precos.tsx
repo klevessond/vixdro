@@ -116,6 +116,18 @@ export default function PrecosScreen() {
           >
             {salvando ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.botaoTexto}>Salvar</Text>}
           </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [styles.atalhoFormas, pressed && { backgroundColor: COR.bordaClara }]}
+            onPress={() => router.push('/configuracoes/formas-pagamento')}
+            accessibilityRole="button"
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={styles.atalhoTitulo}>Formas de pagamento</Text>
+              <Text style={styles.atalhoTexto}>À vista com desconto, parcelado, entrada: aparecem no PDF do orçamento.</Text>
+            </View>
+            <Text style={styles.atalhoSeta}>›</Text>
+          </Pressable>
         </ScrollView>
       )}
     </KeyboardAvoidingView>
@@ -135,4 +147,11 @@ const styles = StyleSheet.create({
   ajuda: { color: COR.tintaSuave, fontSize: 13, marginTop: 4 },
   botao: { backgroundColor: COR.borda, borderRadius: 6, paddingVertical: 15, alignItems: 'center', marginTop: 8 },
   botaoTexto: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  atalhoFormas: {
+    flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 24, padding: 16,
+    borderWidth: 1, borderColor: COR.linha, borderRadius: 10, backgroundColor: COR.superficie,
+  },
+  atalhoTitulo: { color: COR.tinta, fontSize: 16, fontWeight: '700' },
+  atalhoTexto: { color: COR.tintaSuave, fontSize: 13, marginTop: 2 },
+  atalhoSeta: { color: COR.borda, fontSize: 26, fontWeight: '700' },
 });

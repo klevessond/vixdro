@@ -3,6 +3,7 @@
 // Uma peça do projeto: nome, medidas, quantidade e os itens copiados do
 // modelo. Mudar um item aqui vale só para esta peça.
 
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import {
   Alert,
@@ -166,10 +167,17 @@ export function EditorPeca({ peca, nova, onSalvar, onRemover, onFechar }: Props)
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView style={styles.tela} contentContainerStyle={styles.conteudo} keyboardShouldPersistTaps="handled">
           <View style={styles.topo}>
-            <Text style={styles.titulo}>{nova ? 'Nova peça' : 'Editar peça'}</Text>
-            <Pressable onPress={onFechar} hitSlop={10}>
-              <Text style={styles.link}>Cancelar</Text>
+            <Pressable
+              onPress={onFechar}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Voltar sem salvar a peça"
+              style={({ pressed }) => [styles.voltar, pressed && { backgroundColor: COR.bordaClara }]}
+            >
+              <MaterialCommunityIcons name="arrow-left" size={20} color={COR.borda} />
+              <Text style={styles.voltarTexto}>Voltar</Text>
             </Pressable>
+            <Text style={styles.titulo}>{nova ? 'Nova peça' : 'Editar peça'}</Text>
           </View>
 
           <Text style={styles.rotulo}>Nome</Text>
@@ -279,9 +287,18 @@ export function EditorPeca({ peca, nova, onSalvar, onRemover, onFechar }: Props)
             </View>
           )}
 
-          <Pressable style={styles.botao} onPress={confirmar}>
-            <Text style={styles.botaoTexto}>{nova ? 'Adicionar ao projeto' : 'Confirmar'}</Text>
-          </Pressable>
+          <View style={styles.acoes}>
+            <Pressable
+              style={({ pressed }) => [styles.cancelar, pressed && { backgroundColor: COR.bordaClara }]}
+              onPress={onFechar}
+              accessibilityRole="button"
+            >
+              <Text style={styles.cancelarTexto}>Cancelar</Text>
+            </Pressable>
+            <Pressable style={[styles.botao, { flex: 1, marginTop: 0 }]} onPress={confirmar} accessibilityRole="button">
+              <Text style={styles.botaoTexto}>{nova ? 'Adicionar ao projeto' : 'Confirmar'}</Text>
+            </Pressable>
+          </View>
           {!nova && (
             <Pressable style={styles.remover} onPress={confirmarRemocao}>
               <Text style={styles.removerTexto}>Remover peça do projeto</Text>
@@ -305,7 +322,18 @@ export function EditorPeca({ peca, nova, onSalvar, onRemover, onFechar }: Props)
 const styles = StyleSheet.create({
   tela: { flex: 1, backgroundColor: COR.fundo },
   conteudo: { padding: 20, paddingBottom: 48 },
-  topo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  topo: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 16 },
+  voltar: {
+    flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1.5, borderColor: COR.borda,
+    borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7,
+  },
+  voltarTexto: { color: COR.borda, fontSize: 15, fontWeight: '700' },
+  acoes: { flexDirection: 'row', gap: 10, marginTop: 24 },
+  cancelar: {
+    borderWidth: 1.5, borderColor: COR.borda, borderRadius: 6, paddingVertical: 14, paddingHorizontal: 20,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  cancelarTexto: { color: COR.borda, fontSize: 16, fontWeight: '700' },
   titulo: { color: COR.tinta, fontSize: 20, fontWeight: '700' },
   link: { color: COR.borda, fontSize: 15, fontWeight: '700' },
   rotulo: { color: COR.tinta, fontSize: 14, fontWeight: '600', marginBottom: 6 },

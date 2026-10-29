@@ -62,6 +62,8 @@ export type Projeto = Precificacao & {
   // Quanto de cada item sai do estoque: {"<id do item>": "1"}. Não muda o
   // preço para o cliente; só o que é pedido ao fornecedor.
   estoque_usado?: Record<string, string>;
+  // Forma de pagamento combinada com o cliente (id da condição).
+  condicao_pagamento?: string | null;
   linhas: Peca[];
   atualizado_em?: string;
 };
@@ -109,7 +111,22 @@ export type LinhaCalculada = {
   preco_total: string;
 };
 
+/** Uma forma de pagamento com os valores já calculados para este orçamento. */
+export type CondicaoOrcamento = {
+  id: string;
+  nome: string;
+  tipo: 'avista' | 'parcelado' | 'entrada';
+  desconto_percentual: string;
+  acrescimo_percentual: string;
+  entrada_percentual: string;
+  total: string;
+  entrada: string;
+  parcelas: number;
+  valor_parcela: string;
+};
+
 export type CalculoProjeto = {
+  condicoes?: CondicaoOrcamento[];
   perda_percentual: string;
   orcamento: {
     subtotal: string;
@@ -182,6 +199,7 @@ function corpoProjeto(p: Projeto) {
     perda_percentual: p.perda_percentual || '0',
     ...precoParaEnvio(p),
     estoque_usado: p.estoque_usado ?? {},
+    condicao_pagamento: p.condicao_pagamento ?? null,
     linhas: p.linhas.map((l) => ({ ...l, itens: itensParaEnvio(l.itens) })),
   };
 }

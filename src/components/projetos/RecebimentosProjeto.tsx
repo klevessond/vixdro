@@ -20,20 +20,34 @@ import {
   View,
 } from 'react-native';
 
-import { Lancamento, gerarCobrancasProjeto, listarLancamentos, marcarPago } from '@/api/financeiro';
+import { Condicao, Lancamento, gerarCobrancasProjeto, listarCondicoes, listarLancamentos, marcarPago, simularCondicao } from '@/api/financeiro';
+import { ConfirmarPagamento } from '@/components/financeiro/ConfirmarPagamento';
 import { numero, reais } from '@/api/produtos';
 import { cor, espaco, raio, sombra } from '@/ui/tema';
 import { hojeISO, isoParaTexto, mascaraData, somarMesesISO, textoParaISO } from '@/util/datas';
 
 const VERDE = '#1E6B3A';
 
-type Props = { projetoId: string; pro: boolean; total?: string | null };
+type Props = {
+  projetoId: string;
+  pro: boolean;
+  total?: string | null;
+  condicaoCombinada?: string | null; // forma de pagamento combinada no projeto
+  pedirGeracao?: number; // muda de valor = abrir a geração (ex: logo após aprovar)
+  onCondicaoDefinida?: (id: string) => void;
+};
 
-export function RecebimentosProjeto({ projetoId, pro, total }: Props) {
+export function RecebimentosProjeto({ projetoId, pro, total, condicaoCombinada, pedirGeracao, onCondicaoDefinida }: Props) {
   const router = useRouter();
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [gerando, setGerando] = useState(false);
+  const [confirmando, setConfirmando] = useState<Lancamento | null>(null);
+
+  // Logo após aprovar o orçamento: oferece gerar as contas a receber (se ainda não há).
+  useEffect(() => {
+    if (pro && pedirGeracao && !carregando && lancamentos.length === 0) setGerando(true);
+  }, [pedirGeracao, carregando]);
 
   useEffect(() => {
     if (!pro) return;
@@ -56,8 +70,12 @@ export function RecebimentosProjeto({ projetoId, pro, total }: Props) {
   const totalCobrado = lancamentos.reduce((t, l) => t + numero(l.valor), 0);
 
   async function alternar(l: Lancamento) {
+    if (!l.pago) {
+      setConfirmando(l); // pergunta a conta, a forma e a data
+      return;
+    }
     try {
-      const atualizado = await marcarPago(l.id!, !l.pago);
+      const atualizado = await marcarPago(l.id!, false);
       setLancamentos((lista) => lista.map((x) => (x.id === l.id ? atualizado : x)));
     } catch (e: any) {
       Alert.alert('Não foi possível atualizar', e?.message ?? 'Tente novamente.');
@@ -86,7 +104,7 @@ export function RecebimentosProjeto({ projetoId, pro, total }: Props) {
         <>
           <Text style={styles.vazio}>Gere o sinal e as parcelas a partir do total do orçamento.</Text>
           <Pressable style={styles.botao} onPress={() => setGerando(true)}>
-            <Text style={styles.botaoTexto}>Gerar cobranças</Text>
+            <Text style={styles.botaoTexto}>Gerar contas a receber</Text>
           </Pressable>
         </>
       ) : (
@@ -117,13 +135,24 @@ export function RecebimentosProjeto({ projetoId, pro, total }: Props) {
         <GerarCobrancas
           projetoId={projetoId}
           total={total}
-          onGerado={(novos) => {
+          condicaoCombinada={condicaoCombinada}
+          onGerado={(novos, condicao) => {
             setLancamentos(novos);
             setGerando(false);
+            if (condicao) onCondicaoDefinida?.(condicao);
           }}
           onFechar={() => setGerando(false)}
         />
       )}
+
+      <ConfirmarPagamento
+        lancamento={confirmando}
+        onConfirmado={(l) => {
+          setConfirmando(null);
+          setLancamentos((lista) => lista.map((x) => (x.id === l.id ? l : x)));
+        }}
+        onFechar={() => setConfirmando(null)}
+      />
     </View>
   );
 }
@@ -131,41 +160,65 @@ export function RecebimentosProjeto({ projetoId, pro, total }: Props) {
 function GerarCobrancas({
   projetoId,
   total,
+  condicaoCombinada,
   onGerado,
   onFechar,
 }: {
   projetoId: string;
   total?: string | null;
-  onGerado: (l: Lancamento[]) => void;
+  condicaoCombinada?: string | null;
+  onGerado: (l: Lancamento[], condicao?: string) => void;
   onFechar: () => void;
 }) {
-  const [entrada, setEntrada] = useState('50');
-  const [vencEntrada, setVencEntrada] = useState(isoParaTexto(hojeISO()));
-  const [parcelas, setParcelas] = useState('1');
+  const [condicoes, setCondicoes] = useState<Condicao[]>([]);
+  const [escolha, setEscolha] = useState<string>(''); // id da condição ou 'personalizado'
+  const [parcelas, setParcelas] = useState('');
+  const [vencimento, setVencimento] = useState(isoParaTexto(hojeISO()));
   const [primeiro, setPrimeiro] = useState(isoParaTexto(somarMesesISO(hojeISO(), 1)));
+  const [entrada, setEntrada] = useState('50'); // personalizado
   const [salvando, setSalvando] = useState(false);
 
-  const pct = Math.min(100, Math.max(0, numero(entrada)));
-  const n = Math.max(0, parseInt(parcelas, 10) || 0);
+  useEffect(() => {
+    listarCondicoes()
+      .then((lista) => {
+        setCondicoes(lista);
+        const inicial = lista.find((c) => c.id === condicaoCombinada) ?? lista[0];
+        setEscolha(inicial?.id ?? 'personalizado');
+        if (inicial) setParcelas(String(inicial.max_parcelas));
+      })
+      .catch(() => setEscolha('personalizado'));
+  }, []);
+
+  const cond = condicoes.find((c) => c.id === escolha);
   const valorTotal = total ? numero(total) : null;
-  const valorEntrada = valorTotal !== null ? Math.round(valorTotal * pct) / 100 : null;
+  const n = Math.max(1, parseInt(parcelas, 10) || 1);
+  const sim = cond && valorTotal !== null ? simularCondicao(cond, valorTotal, n) : null;
+  const pct = Math.min(100, Math.max(0, numero(entrada)));
+
+  function escolher(id: string) {
+    setEscolha(id);
+    const c = condicoes.find((x) => x.id === id);
+    if (c) setParcelas(String(c.max_parcelas));
+  }
 
   async function gerar() {
-    const ve = textoParaISO(vencEntrada);
+    const ve = textoParaISO(vencimento);
     const pv = textoParaISO(primeiro);
-    if (pct > 0 && !ve) return Alert.alert('Data inválida', 'Confira o vencimento do sinal (dd/mm/aaaa).');
-    if (pct < 100 && (!pv || n < 1)) return Alert.alert('Confira o restante', 'Informe as parcelas e o primeiro vencimento.');
+    if (!ve) return Alert.alert('Data inválida', 'Confira a data (dd/mm/aaaa).');
+    const precisaPrimeiro = cond ? cond.tipo === 'entrada' : pct < 100;
+    if (precisaPrimeiro && !pv) return Alert.alert('Data inválida', 'Confira o vencimento da primeira parcela.');
     setSalvando(true);
     try {
-      onGerado(
-        await gerarCobrancasProjeto({
-          projeto: projetoId,
-          entrada_percentual: String(pct),
-          vencimento_entrada: ve ?? hojeISO(),
-          parcelas_restantes: pct < 100 ? n : 0,
-          primeiro_vencimento: pct < 100 ? pv! : undefined,
-        })
-      );
+      const gerados = cond
+        ? await gerarCobrancasProjeto({
+            projeto: projetoId, condicao: cond.id, parcelas: cond.tipo === 'avista' ? 1 : Math.min(n, cond.max_parcelas),
+            vencimento_entrada: ve, primeiro_vencimento: cond.tipo === 'entrada' ? pv! : undefined,
+          })
+        : await gerarCobrancasProjeto({
+            projeto: projetoId, entrada_percentual: String(pct), vencimento_entrada: ve,
+            parcelas_restantes: pct < 100 ? n : 0, primeiro_vencimento: pct < 100 ? pv! : undefined,
+          });
+      onGerado(gerados, cond?.id);
     } catch (e: any) {
       Alert.alert('Não foi possível gerar', e?.message ?? 'Tente novamente.');
     } finally {
@@ -173,46 +226,69 @@ function GerarCobrancas({
     }
   }
 
+  const rotuloData = !cond ? 'Vencimento do sinal' : cond.tipo === 'avista' ? 'Vencimento' : cond.tipo === 'entrada' ? 'Vencimento da entrada' : '1º vencimento';
+
   return (
     <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onFechar}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView style={{ flex: 1, backgroundColor: cor.fundo }} contentContainerStyle={{ padding: espaco.xl, gap: espaco.md }} keyboardShouldPersistTaps="handled">
           <View style={styles.modalTopo}>
-            <Text style={styles.modalTitulo}>Gerar cobranças</Text>
+            <Text style={styles.modalTitulo}>Gerar contas a receber</Text>
             <Pressable onPress={onFechar} hitSlop={10}>
               <Text style={styles.link}>Cancelar</Text>
             </Pressable>
           </View>
           {valorTotal !== null && <Text style={styles.total}>Total do orçamento: {reais(valorTotal)}</Text>}
 
-          <Text style={styles.rotulo}>Sinal (% do total)</Text>
-          <View style={styles.linha}>
-            <TextInput style={[styles.input, { width: 90 }]} value={entrada} onChangeText={(v) => setEntrada(v.replace(/[^0-9,.]/g, ''))} keyboardType="decimal-pad" />
-            <TextInput style={[styles.input, { flex: 1 }]} value={vencEntrada} onChangeText={(v) => setVencEntrada(mascaraData(v))} keyboardType="number-pad" placeholder="vencimento" placeholderTextColor="#93A3A5" />
+          <Text style={styles.rotulo}>Forma de pagamento</Text>
+          <View style={styles.chips}>
+            {condicoes.map((c) => (
+              <Pressable key={c.id} onPress={() => escolher(c.id!)} style={[styles.chip, escolha === c.id && styles.chipAtivo]}>
+                <Text style={[styles.chipTexto, escolha === c.id && { color: '#FFFFFF' }]}>{c.nome}</Text>
+              </Pressable>
+            ))}
+            <Pressable onPress={() => setEscolha('personalizado')} style={[styles.chip, escolha === 'personalizado' && styles.chipAtivo]}>
+              <Text style={[styles.chipTexto, escolha === 'personalizado' && { color: '#FFFFFF' }]}>Personalizado</Text>
+            </Pressable>
           </View>
-          {valorEntrada !== null && pct > 0 && <Text style={styles.previa}>Sinal de {reais(valorEntrada)}</Text>}
 
-          {pct < 100 && (
+          {!cond && (
             <>
-              <Text style={styles.rotulo}>Restante em quantas parcelas? (1º vencimento)</Text>
-              <View style={styles.linha}>
-                <TextInput style={[styles.input, { width: 90 }]} value={parcelas} onChangeText={(v) => setParcelas(v.replace(/\D/g, '').slice(0, 2))} keyboardType="number-pad" />
-                <TextInput style={[styles.input, { flex: 1 }]} value={primeiro} onChangeText={(v) => setPrimeiro(mascaraData(v))} keyboardType="number-pad" placeholder="dd/mm/aaaa" placeholderTextColor="#93A3A5" />
-              </View>
-              {valorTotal !== null && valorEntrada !== null && n > 0 && (
-                <Text style={styles.previa}>
-                  {n === 1 ? 'Restante de ' : `${n}× de `}
-                  {reais(Math.floor(((valorTotal - valorEntrada) / n) * 100) / 100)}
-                  {n > 1 ? ', uma por mês' : ''}
-                </Text>
-              )}
+              <Text style={styles.rotulo}>Sinal (% do total)</Text>
+              <TextInput style={[styles.input, { width: 90 }]} value={entrada} onChangeText={(v) => setEntrada(v.replace(/[^0-9,.]/g, ''))} keyboardType="decimal-pad" />
             </>
+          )}
+          {(cond ? cond.tipo !== 'avista' : pct < 100) && (
+            <>
+              <Text style={styles.rotulo}>
+                {cond ? `Parcelas (até ${cond.max_parcelas})` : 'Restante em quantas parcelas'}
+              </Text>
+              <TextInput style={[styles.input, { width: 90 }]} value={parcelas} onChangeText={(v) => setParcelas(v.replace(/\D/g, '').slice(0, 2))} keyboardType="number-pad" />
+            </>
+          )}
+
+          <Text style={styles.rotulo}>{rotuloData}</Text>
+          <TextInput style={[styles.input, { width: 160 }]} value={vencimento} onChangeText={(v) => setVencimento(mascaraData(v))} keyboardType="number-pad" placeholder="dd/mm/aaaa" placeholderTextColor="#93A3A5" />
+          {(cond ? cond.tipo === 'entrada' : pct < 100) && (
+            <>
+              <Text style={styles.rotulo}>1ª parcela do restante</Text>
+              <TextInput style={[styles.input, { width: 160 }]} value={primeiro} onChangeText={(v) => setPrimeiro(mascaraData(v))} keyboardType="number-pad" placeholder="dd/mm/aaaa" placeholderTextColor="#93A3A5" />
+            </>
+          )}
+
+          {sim && cond && (
+            <Text style={styles.previa}>
+              {cond.tipo === 'avista'
+                ? `1 recebimento de ${reais(sim.total)}`
+                : `${cond.tipo === 'entrada' ? `Entrada de ${reais(sim.entrada)} + ` : ''}${sim.parcelas}x de ${reais(sim.valorParcela)}, uma por mês`}
+              {sim.total !== valorTotal ? ` (total ${reais(sim.total)})` : ''}
+            </Text>
           )}
 
           <Pressable style={[styles.botao, salvando && { opacity: 0.7 }]} onPress={gerar} disabled={salvando}>
             {salvando ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.botaoTexto}>Gerar</Text>}
           </Pressable>
-          <Text style={styles.nota}>As cobranças aparecem no Financeiro, como contas a receber deste cliente.</Text>
+          <Text style={styles.nota}>As contas aparecem no Financeiro, em "A receber", ligadas a este cliente.</Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </Modal>
@@ -251,6 +327,10 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: cor.borda, borderRadius: raio.campo, paddingHorizontal: 12, paddingVertical: 11,
     fontSize: 15, color: cor.texto, backgroundColor: cor.cartao,
   },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: { borderWidth: 1, borderColor: cor.borda, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: cor.cartao },
+  chipAtivo: { backgroundColor: cor.marca, borderColor: cor.marca },
+  chipTexto: { color: cor.texto, fontSize: 14, fontWeight: '600' },
   previa: { color: cor.marca, fontSize: 14, fontWeight: '700' },
   nota: { color: cor.textoSuave, fontSize: 13, textAlign: 'center' },
 });

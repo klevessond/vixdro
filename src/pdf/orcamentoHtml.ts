@@ -66,6 +66,28 @@ function dataBR(d: Date) {
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
+/** Formas de pagamento com os valores (ex: "À vista: R$ 950,00 (5% de desconto)"). */
+function blocoPagamento(calculo: CalculoProjeto, projeto: Projeto): string {
+  const lista = calculo.condicoes ?? [];
+  if (!lista.length) return '';
+  const pct = (v: string) => Number(v).toLocaleString('pt-BR');
+  const linhas = lista.map((c) => {
+    let valor: string;
+    if (c.tipo === 'avista') {
+      valor = `${reais(c.total)}${Number(c.desconto_percentual) > 0 ? ` (${pct(c.desconto_percentual)}% de desconto)` : ''}`;
+    } else {
+      const parcelas = `${c.parcelas}x de ${reais(c.valor_parcela)}`;
+      valor = c.tipo === 'entrada'
+        ? `${reais(c.entrada)} de entrada + ${parcelas}`
+        : `${c.parcelas > 1 ? 'até ' : ''}${parcelas}`;
+      if (Number(c.acrescimo_percentual) > 0) valor += ` (total ${reais(c.total)})`;
+    }
+    const combinada = projeto.condicao_pagamento === c.id;
+    return `<div class="${combinada ? 'combinada' : ''}"><span>${esc(c.nome)}${combinada ? ' (combinada)' : ''}</span><span>${valor}</span></div>`;
+  });
+  return `<div class="pagamento"><h3>Formas de pagamento</h3>${linhas.join('')}</div>`;
+}
+
 export function htmlOrcamento({ projeto, calculo, vidraceiro, cliente, logo }: DadosOrcamento): string {
   const hoje = new Date();
   const validade = new Date(hoje);
@@ -109,6 +131,10 @@ export function htmlOrcamento({ projeto, calculo, vidraceiro, cliente, logo }: D
   .totais { margin-left: auto; width: 55%; margin-top: 12px; }
   .totais div { display: flex; justify-content: space-between; padding: 4px 4px; }
   .total { border-top: 2px solid #1E5B57; margin-top: 4px; padding-top: 8px !important; font-size: 16px; font-weight: 800; color: #1E5B57; }
+  .pagamento { margin-top: 22px; border: 1px solid #D6E1DF; border-radius: 6px; padding: 10px 14px; }
+  .pagamento h3 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #1E5B57; }
+  .pagamento div { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; }
+  .pagamento .combinada { font-weight: 700; }
   .obs { margin-top: 22px; padding: 10px 12px; background: #F1F5F4; border-left: 3px solid #1E5B57; white-space: pre-wrap; }
   .rodape { margin-top: 30px; font-size: 10px; color: #546B6D; text-align: center; }
 </style></head>
@@ -154,6 +180,8 @@ export function htmlOrcamento({ projeto, calculo, vidraceiro, cliente, logo }: D
     ${temDesconto ? `<div><span>Desconto</span><span>− ${reais(o.desconto)}</span></div>` : ''}
     <div class="total"><span>Total</span><span>${reais(o.total)}</span></div>
   </div>
+
+  ${blocoPagamento(calculo, projeto)}
 
   ${projeto.observacoes?.trim() ? `<div class="obs">${esc(projeto.observacoes.trim())}</div>` : ''}
 
