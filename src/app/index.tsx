@@ -37,11 +37,13 @@ export default function Inicio() {
 
   const [painel, setPainel] = useState<Painel | null>(null);
   const [mostrarMargem, setMostrarMargem] = useState(false);
+  const [mostrarFinanceiro, setMostrarFinanceiro] = useState(false);
 
   // Atualiza ao voltar para a tela, e esconde a margem de novo.
   useFocusEffect(
     useCallback(() => {
       setMostrarMargem(false);
+      setMostrarFinanceiro(false); // valores escondidos de novo ao voltar à tela
       obterPainel().then(setPainel).catch(() => {});
     }, [])
   );
@@ -248,7 +250,8 @@ export default function Inicio() {
               icone="cash-multiple"
               titulo="Financeiro"
               rotulo="A receber este mês"
-              valor={reais(painel.financeiro.receber_mes ?? '0')}
+              valor={mostrarFinanceiro ? reais(painel.financeiro.receber_mes ?? '0') : 'R$ ••••'}
+              olho={{ aberto: mostrarFinanceiro, alternar: () => setMostrarFinanceiro((v) => !v) }}
               extra={painel.financeiro.vencidos ? { valor: String(painel.financeiro.vencidos), rotulo: 'recebimentos vencidos' } : undefined}
               descricao="Contas a receber e a pagar, parcelas e o saldo do mês."
               acao="Abrir"
@@ -327,7 +330,7 @@ function Cartao({ icone, titulo, rotulo, valor, extra, olho, descricao, acao, on
             <View style={styles.valorLinha}>
               <Text style={styles.valor}>{valor}</Text>
               {olho && (
-                <Pressable onPress={olho.alternar} hitSlop={12} accessibilityLabel={olho.aberto ? 'Esconder margem' : 'Mostrar margem'}>
+                <Pressable onPress={olho.alternar} hitSlop={12} accessibilityLabel={olho.aberto ? 'Esconder valor' : 'Mostrar valor'}>
                   <MaterialCommunityIcons name={olho.aberto ? 'eye-off-outline' : 'eye-outline'} size={22} color={cor.textoSuave} />
                 </Pressable>
               )}
