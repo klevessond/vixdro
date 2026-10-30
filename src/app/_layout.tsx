@@ -15,6 +15,7 @@ import { Platform, useColorScheme, View } from 'react-native';
 import { AuthProvider, useProtecaoDeRotas } from '@/auth/AuthContext';
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { useSincronizacaoAutomatica } from '../sync/useSincronizacaoAutomatica';
+import { BotaoVoltar } from '@/components/navegacao/BotaoVoltar';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -41,10 +42,14 @@ function Navegacao() {
   useProtecaoDeRotas();
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="(auth)" />
-      
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        // Botão de voltar padrão de todas as telas com cabeçalho (inclusive as futuras).
+        headerLeft: () => <BotaoVoltar />,
+        headerBackVisible: false,
+      }}
+    >
       <Stack.Screen name="(interno)/clientes/novo" options={{ headerShown: true, title: 'Novo cliente' }} />
     </Stack>
   );

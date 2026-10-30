@@ -48,3 +48,10 @@ export function somarMesesISO(iso: string, meses: number): string {
   const ultimo = new Date(alvo.getFullYear(), alvo.getMonth() + 1, 0).getDate();
   return `${alvo.getFullYear()}-${p2(alvo.getMonth() + 1)}-${p2(Math.min(d, ultimo))}`;
 }
+
+/** N dias depois, em "aaaa-mm-dd". */
+export function somarDiasISO(iso: string, dias: number): string {
+  const [a, m, d] = iso.split('-').map(Number);
+  const r = new Date(a, m - 1, d + dias);
+  return `${r.getFullYear()}-${p2(r.getMonth() + 1)}-${p2(r.getDate())}`;
+}

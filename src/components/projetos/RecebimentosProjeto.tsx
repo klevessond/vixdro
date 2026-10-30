@@ -24,7 +24,7 @@ import { Condicao, Lancamento, gerarCobrancasProjeto, listarCondicoes, listarLan
 import { ConfirmarPagamento } from '@/components/financeiro/ConfirmarPagamento';
 import { numero, reais } from '@/api/produtos';
 import { cor, espaco, raio, sombra } from '@/ui/tema';
-import { hojeISO, isoParaTexto, mascaraData, somarMesesISO, textoParaISO } from '@/util/datas';
+import { hojeISO, isoParaTexto, mascaraData, somarDiasISO, somarMesesISO, textoParaISO } from '@/util/datas';
 
 const VERDE = '#1E6B3A';
 
@@ -176,6 +176,8 @@ function GerarCobrancas({
   const [vencimento, setVencimento] = useState(isoParaTexto(hojeISO()));
   const [primeiro, setPrimeiro] = useState(isoParaTexto(somarMesesISO(hojeISO(), 1)));
   const [entrada, setEntrada] = useState('50'); // personalizado
+  const [intervalo, setIntervalo] = useState('30'); // dias entre as parcelas
+  const [datas, setDatas] = useState<string[]>([]); // uma por parcela, editáveis
   const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
@@ -195,6 +197,21 @@ function GerarCobrancas({
   const sim = cond && valorTotal !== null ? simularCondicao(cond, valorTotal, n) : null;
   const pct = Math.min(100, Math.max(0, numero(entrada)));
 
+  // Quantas parcelas têm data própria (a entrada e o à vista usam a data de cima).
+  const qtdParcelas = !cond
+    ? (pct < 100 ? n : 0)
+    : cond.tipo === 'avista' ? 0 : Math.min(n, cond.max_parcelas);
+  // A 1ª parcela: no parcelado, a data de cima; com entrada, a "1ª parcela do restante".
+  const baseParcelas = cond?.tipo === 'parcelado' ? vencimento : primeiro;
+
+  // Datas sugeridas: a primeira e as seguintes a cada N dias (refeitas ao mudar a base).
+  useEffect(() => {
+    const base = textoParaISO(baseParcelas);
+    const dias = Math.max(1, parseInt(intervalo, 10) || 30);
+    if (!base) return;
+    setDatas(Array.from({ length: qtdParcelas }, (_, i) => isoParaTexto(somarDiasISO(base, i * dias))));
+  }, [baseParcelas, intervalo, qtdParcelas]);
+
   function escolher(id: string) {
     setEscolha(id);
     const c = condicoes.find((x) => x.id === id);
@@ -207,16 +224,19 @@ function GerarCobrancas({
     if (!ve) return Alert.alert('Data inválida', 'Confira a data (dd/mm/aaaa).');
     const precisaPrimeiro = cond ? cond.tipo === 'entrada' : pct < 100;
     if (precisaPrimeiro && !pv) return Alert.alert('Data inválida', 'Confira o vencimento da primeira parcela.');
+    const vencimentos = datas.map(textoParaISO);
+    if (vencimentos.some((d) => !d)) return Alert.alert('Data inválida', 'Confira as datas das parcelas (dd/mm/aaaa).');
+    const lista = qtdParcelas > 0 ? (vencimentos as string[]) : undefined;
     setSalvando(true);
     try {
       const gerados = cond
         ? await gerarCobrancasProjeto({
-            projeto: projetoId, condicao: cond.id, parcelas: cond.tipo === 'avista' ? 1 : Math.min(n, cond.max_parcelas),
-            vencimento_entrada: ve, primeiro_vencimento: cond.tipo === 'entrada' ? pv! : undefined,
+            projeto: projetoId, condicao: cond.id, parcelas: cond.tipo === 'avista' ? 1 : qtdParcelas,
+            vencimento_entrada: ve, primeiro_vencimento: cond.tipo === 'entrada' ? pv! : undefined, vencimentos: lista,
           })
         : await gerarCobrancasProjeto({
             projeto: projetoId, entrada_percentual: String(pct), vencimento_entrada: ve,
-            parcelas_restantes: pct < 100 ? n : 0, primeiro_vencimento: pct < 100 ? pv! : undefined,
+            parcelas_restantes: qtdParcelas, primeiro_vencimento: pct < 100 ? (lista?.[0] ?? pv!) : undefined, vencimentos: lista,
           });
       onGerado(gerados, cond?.id);
     } catch (e: any) {
@@ -276,11 +296,44 @@ function GerarCobrancas({
             </>
           )}
 
+          {qtdParcelas > 1 && (
+            <>
+              <Text style={styles.rotulo}>Intervalo entre os vencimentos (dias)</Text>
+              <TextInput
+                style={[styles.input, { width: 90 }]}
+                value={intervalo}
+                onChangeText={(v) => setIntervalo(v.replace(/\D/g, '').slice(0, 3))}
+                keyboardType="number-pad"
+              />
+            </>
+          )}
+          {qtdParcelas > 0 && (
+            <>
+              <Text style={styles.rotulo}>Vencimento de cada parcela</Text>
+              <View style={styles.datasParcelas}>
+                {datas.map((d, i) => (
+                  <View key={i} style={styles.dataParcela}>
+                    <Text style={styles.dataParcelaRotulo}>{i + 1}ª</Text>
+                    <TextInput
+                      style={[styles.input, { width: 130 }]}
+                      value={d}
+                      onChangeText={(v) => setDatas((lista) => lista.map((x, j) => (j === i ? mascaraData(v) : x)))}
+                      keyboardType="number-pad"
+                      placeholder="dd/mm/aaaa"
+                      placeholderTextColor="#93A3A5"
+                    />
+                  </View>
+                ))}
+              </View>
+              <Text style={styles.nota}>Já vêm preenchidas pelo intervalo; troque qualquer data, se precisar.</Text>
+            </>
+          )}
+
           {sim && cond && (
             <Text style={styles.previa}>
               {cond.tipo === 'avista'
                 ? `1 recebimento de ${reais(sim.total)}`
-                : `${cond.tipo === 'entrada' ? `Entrada de ${reais(sim.entrada)} + ` : ''}${sim.parcelas}x de ${reais(sim.valorParcela)}, uma por mês`}
+                : `${cond.tipo === 'entrada' ? `Entrada de ${reais(sim.entrada)} + ` : ''}${sim.parcelas}x de ${reais(sim.valorParcela)}, nas datas abaixo`}
               {sim.total !== valorTotal ? ` (total ${reais(sim.total)})` : ''}
             </Text>
           )}
@@ -328,6 +381,9 @@ const styles = StyleSheet.create({
     fontSize: 15, color: cor.texto, backgroundColor: cor.cartao,
   },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  datasParcelas: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  dataParcela: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  dataParcelaRotulo: { color: cor.textoSuave, fontSize: 14, fontWeight: '700', width: 26 },
   chip: { borderWidth: 1, borderColor: cor.borda, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: cor.cartao },
   chipAtivo: { backgroundColor: cor.marca, borderColor: cor.marca },
   chipTexto: { color: cor.texto, fontSize: 14, fontWeight: '600' },

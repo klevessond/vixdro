@@ -6,8 +6,8 @@
 
 import * as Crypto from 'expo-crypto';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -50,6 +50,10 @@ import { AjustesOrcamento, ValoresAjuste } from '@/components/projetos/AjustesOr
 import { EditorPeca } from '@/components/projetos/EditorPeca';
 import { MedicaoProjeto } from '@/components/projetos/MedicaoProjeto';
 import { Condicao, listarCondicoes } from '@/api/financeiro';
+import { BotaoListaCompraPdf } from '@/components/projetos/BotaoListaCompraPdf';
+import { compartilharPdf } from '@/pdf/gerarPdf';
+import { QuaisItens, htmlListaCompra, tituloListaCompra } from '@/pdf/listaCompraHtml';
+import { ComprasProjeto } from '@/components/projetos/ComprasProjeto';
 import { RecebimentosProjeto } from '@/components/projetos/RecebimentosProjeto';
 import { usePlano } from '@/hooks/usePlano';
 import { SeletorCliente } from '@/components/projetos/SeletorCliente';
@@ -115,11 +119,14 @@ type EdicaoPeca = { indice: number | null; peca: Peca };
 export default function EditorProjeto() {
   const { id, cobrancas } = useLocalSearchParams<{ id: string; cobrancas?: string }>();
   const router = useRouter();
+  const navigation = useNavigation();
+  const [salvoAgora, setSalvoAgora] = useState(false);
   const { vidraceiro } = useAuth();
   const { pro } = usePlano(); // a agenda e o financeiro são do plano Pro
   const [condicoes, setCondicoes] = useState<Condicao[]>([]);
   // Muda de valor para abrir a geração das contas a receber (ex: logo após aprovar).
   const [pedirGeracao, setPedirGeracao] = useState(cobrancas ? 1 : 0);
+  const [versaoCompras, setVersaoCompras] = useState(0); // recarrega as compras (ex: após o pedido)
 
   useEffect(() => {
     listarCondicoes().then(setCondicoes).catch(() => {});
@@ -252,11 +259,85 @@ export default function EditorProjeto() {
     setSalvando(true);
     try {
       await gravar();
-      router.back();
+      // Continua no projeto. Num projeto novo, o endereço passa a ser o dele
+      // (/projetos/<id>), para recarregar a página abrir o projeto certo.
+      if (id === 'novo') router.setParams({ id: projeto.id });
+      setSalvoAgora(true);
+      setTimeout(() => setSalvoAgora(false), 3000);
     } catch (e: any) {
       Alert.alert('Não foi possível salvar', e?.message ?? 'Tente novamente.');
     } finally {
       setSalvando(false);
+    }
+  }
+
+  // Alterações não salvas: avisa antes de sair (botão Voltar ou botão do Android).
+  // Usa o evento "beforeRemove" da navegação do próprio expo-router (sem
+  // depender do pacote @react-navigation/native instalado à parte).
+  const temAlteracao = useRef(false);
+  temAlteracao.current = alterado && !salvando;
+  useEffect(() => {
+    const cancelar = navigation.addListener('beforeRemove', (e: any) => {
+      if (!temAlteracao.current) return;
+      e.preventDefault();
+      perguntarAntesDeSair(() => navigation.dispatch(e.data.action));
+    });
+    return cancelar;
+  }, [navigation]);
+
+  function perguntarAntesDeSair(sair: () => void) {
+    if (Platform.OS === 'web') {
+      // No navegador, a janela de confirmação só tem dois botões.
+      Alert.alert('Projeto não salvo', 'Se sair agora, as alterações (como peças novas) serão perdidas. Sair mesmo assim?', [
+        { text: 'Continuar editando', style: 'cancel' },
+        { text: 'Sair sem salvar', style: 'destructive', onPress: () => { temAlteracao.current = false; sair(); } },
+      ]);
+      return;
+    }
+    Alert.alert('Projeto não salvo', 'Se sair agora, as alterações (como peças novas) serão perdidas.', [
+      { text: 'Continuar editando', style: 'cancel' },
+      { text: 'Sair sem salvar', style: 'destructive', onPress: () => { temAlteracao.current = false; sair(); } },
+      {
+        text: 'Salvar e sair',
+        onPress: async () => {
+          if (!podeSalvar()) return;
+          try {
+            await gravar();
+            temAlteracao.current = false; // já salvo: deixa sair sem perguntar de novo
+            sair();
+          } catch (e: any) {
+            Alert.alert('Não foi possível salvar', e?.message ?? 'Tente novamente.');
+          }
+        },
+      },
+    ]);
+  }
+
+  // No navegador, também avisa ao fechar a aba ou recarregar a página.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !alterado) return;
+    const aviso = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', aviso);
+    return () => window.removeEventListener('beforeunload', aviso);
+  }, [alterado]);
+
+  /** Lista de compra em PDF (para outro fornecedor ou para conferir a compra). */
+  async function gerarListaCompra(quais: QuaisItens, comPrecos: boolean) {
+    if (!podeSalvar()) return;
+    try {
+      // Reflete o que está salvo, com o estoque usado já descontado.
+      let numeroOrcamento = projeto.numero;
+      if (!jaExiste || alterado) numeroOrcamento = await gravar();
+      const resultado = await calcularProjeto(projeto);
+      setCalculo(resultado);
+      const logo = await obterLogo().then((l) => l.logo_data_uri).catch(() => null);
+      const dados = { projeto: { ...projeto, numero: numeroOrcamento }, calculo: resultado, vidraceiro, logo, quais, comPrecos };
+      await compartilharPdf(htmlListaCompra(dados), tituloListaCompra(dados));
+    } catch (e: any) {
+      Alert.alert('Não foi possível gerar a lista', e?.message ?? 'Tente novamente.');
     }
   }
 
@@ -319,6 +400,13 @@ export default function EditorProjeto() {
     try {
       const r = await concluirPeca(projeto.id, peca.id, concluida);
       atualizar(r.concluida, r.concluida_em);
+      // Última peça concluída num projeto aprovado: oferece concluir o projeto.
+      if (concluida && r.total_pecas > 0 && r.pecas_concluidas === r.total_pecas && projeto.status === 'aprovado') {
+        Alert.alert('Todas as peças concluídas', 'Marcar o projeto como concluído?', [
+          { text: 'Agora não', style: 'cancel' },
+          { text: 'Marcar concluído', onPress: () => mudarStatus('concluido') },
+        ]);
+      }
     } catch (e: any) {
       atualizar(!!peca.concluida, peca.concluida_em ?? null); // desfaz
       Alert.alert('Não foi possível atualizar a peça', e?.message ?? 'Tente novamente.');
@@ -388,6 +476,7 @@ export default function EditorProjeto() {
     try {
       const criados = await enviarPedido(projeto.id);
       setPedidos(await listarPedidos(projeto.id).catch(() => criados));
+      setVersaoCompras((n) => n + 1); // o pedido enviado vira conta a pagar (Pro)
       if (criados.some((p) => p.status === 'erro')) {
         Alert.alert('Pedido não chegou ao fornecedor', 'Veja o motivo abaixo e tente de novo.');
       }
@@ -765,6 +854,8 @@ export default function EditorProjeto() {
             {salvando ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.botaoTexto}>Salvar projeto</Text>}
           </Pressable>
         )}
+        {salvoAgora && <Text style={styles.salvoAgora}>✓ Projeto salvo</Text>}
+        {alterado && !salvoAgora && !congelado && <Text style={styles.naoSalvo}>Há alterações não salvas.</Text>}
         {projeto.linhas.length > 0 && (
           <Pressable
             style={[styles.botaoContorno, { marginTop: 12 }]}
@@ -787,6 +878,7 @@ export default function EditorProjeto() {
         {jaExiste && projeto.linhas.length > 0 && (
           <>
             <Text style={styles.secao}>Pedido ao fornecedor</Text>
+            <BotaoListaCompraPdf gerar={gerarListaCompra} />
             {!pedidos.length && (
               <Text style={styles.nota}>
                 Separado do orçamento: compartilhar o PDF com o cliente não envia nada ao fornecedor.
@@ -844,6 +936,16 @@ export default function EditorProjeto() {
             pedirGeracao={pedirGeracao}
             // A geração grava a condição no servidor; aqui só atualiza a tela.
             onCondicaoDefinida={(c) => setProjeto((p) => ({ ...p, condicao_pagamento: c }))}
+          />
+        )}
+        {jaExiste && projeto.linhas.length > 0 && (
+          <ComprasProjeto
+            projetoId={projeto.id}
+            pro={pro}
+            referencia={projeto.numero ? `Orçamento nº ${projeto.numero}` : projeto.nome}
+            // Sugestão: o que os itens próprios (comprados fora do pedido) custam.
+            custoItensProprios={(calculo?.lista_compra ?? []).filter((x) => x.proprio).reduce((t, x) => t + numero(x.custo_pedir), 0)}
+            atualizarEm={versaoCompras}
           />
         )}
 
@@ -936,6 +1038,8 @@ function LinhaInterna({ rotulo, valor }: { rotulo: string; valor: string }) {
 const styles = StyleSheet.create({
   tela: { flex: 1, backgroundColor: COR.fundo },
   grade: { flexDirection: 'row', gap: 12 },
+  salvoAgora: { color: '#1E6B3A', fontSize: 14, fontWeight: '700', textAlign: 'center', marginTop: 8 },
+  naoSalvo: { color: '#8A5A00', fontSize: 13, textAlign: 'center', marginTop: 8 },
   formas: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 6 },
   forma: { borderWidth: 1, borderColor: COR.linha, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: COR.superficie },
   formaAtiva: { backgroundColor: COR.borda, borderColor: COR.borda },

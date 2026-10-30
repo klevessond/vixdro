@@ -29,7 +29,15 @@ export function ConfirmarPagamento({ lancamento, onConfirmado, onFechar }: Props
     setForma(lancamento.forma || '');
     setConta(null);
     setData(isoParaTexto(hojeISO()));
-    listarContas().then(setContas).catch(() => setContas([]));
+    listarContas()
+      .then((lista) => {
+        setContas(lista);
+        // Forma já conhecida: a conta correspondente já vem marcada.
+        const tipo = tipoContaDaForma(lancamento.forma || '');
+        const sugerida = tipo ? lista.find((c) => c.tipo === tipo) : undefined;
+        if (sugerida) setConta(sugerida.id!);
+      })
+      .catch(() => setContas([]));
   }, [lancamento?.id]);
 
   function escolherForma(f: FormaPagamento) {
@@ -85,7 +93,10 @@ export function ConfirmarPagamento({ lancamento, onConfirmado, onFechar }: Props
                 </Pressable>
               ))}
             </View>
-            {!conta && <Text style={styles.nota}>Sem conta escolhida, vai para a conta sugerida pela forma (ou a primeira).</Text>}
+            <Text style={styles.nota}>
+              Ao escolher a forma, a conta é marcada sozinha: dinheiro → Caixa · Pix, transferência ou boleto → Banco ·
+              cartão → Cartão. Dá para trocar.
+            </Text>
 
             <Text style={styles.rotulo}>Data</Text>
             <TextInput

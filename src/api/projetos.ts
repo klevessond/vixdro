@@ -37,12 +37,13 @@ export const CAMPOS_PRECO: (keyof Precificacao)[] = [
   'descricao_adicional', 'valor_adicional', 'desconto', 'validade_dias',
 ];
 
-export type StatusProjeto = 'rascunho' | 'enviado' | 'aprovado' | 'recusado';
+export type StatusProjeto = 'rascunho' | 'enviado' | 'aprovado' | 'concluido' | 'recusado';
 
 export const STATUS_PROJETO: { valor: StatusProjeto; rotulo: string; cor: string }[] = [
   { valor: 'rascunho', rotulo: 'Rascunho', cor: '#546B6D' },
   { valor: 'enviado', rotulo: 'Enviado ao cliente', cor: '#8A5A00' },
   { valor: 'aprovado', rotulo: 'Aprovado', cor: '#1E6B3A' },
+  { valor: 'concluido', rotulo: 'Concluído', cor: '#1E5B57' }, // obra entregue
   { valor: 'recusado', rotulo: 'Recusado', cor: '#A32121' },
 ];
 
@@ -88,6 +89,8 @@ export type ItemCompra = {
   modo: 'peca_comprimento' | 'metro' | 'area' | 'unidade';
   consumo_total: string;
   comprimento_mm: number | null;
+  proprio?: boolean; // item próprio: comprado fora do pedido ao fornecedor
+  fornecedor?: string; // nome do fornecedor do item
   quantidade_compra: string;
   quantidade_estoque: string; // sai do estoque do vidraceiro
   quantidade_pedir: string; // o que vai para o pedido ao fornecedor
@@ -240,8 +243,12 @@ export function pecaDoProduto(produto: Produto): Peca {
 }
 
 /** busca: nome do projeto, nº do orçamento, nome/empresa, celular ou CPF/CNPJ do cliente. */
-export async function listarProjetos(busca = ''): Promise<ProjetoResumo[]> {
-  const q = busca.trim() ? `?busca=${encodeURIComponent(busca.trim())}` : '';
+/** Mais recente primeiro (pela última alteração). status: só os desta situação. */
+export async function listarProjetos(busca = '', status?: StatusProjeto): Promise<ProjetoResumo[]> {
+  const p = new URLSearchParams();
+  if (busca.trim()) p.set('busca', busca.trim());
+  if (status) p.set('status', status);
+  const q = p.toString() ? `?${p}` : '';
   return ler(await apiFetch(`/projetos/${q}`), 'Não foi possível carregar os projetos.');
 }
 

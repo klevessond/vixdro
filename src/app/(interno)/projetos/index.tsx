@@ -6,14 +6,35 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { ProjetoResumo, infoStatus, listarProjetos } from '@/api/projetos';
+import { ProjetoResumo, StatusProjeto, infoStatus, listarProjetos } from '@/api/projetos';
 import { LARGURA_FORMULARIO, cor, espaco, raio, sombra } from '@/ui/tema';
 
 function dataCurta(iso: string) {
   return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
 }
+
+/** "hoje", "ontem", "há 5 dias", "há 3 semanas", "há 2 meses". */
+function haQuanto(iso: string) {
+  const inicio = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const dias = Math.round((inicio(new Date()) - inicio(new Date(iso))) / 86400000);
+  if (dias <= 0) return 'hoje';
+  if (dias === 1) return 'ontem';
+  if (dias < 14) return `há ${dias} dias`;
+  if (dias < 60) return `há ${Math.floor(dias / 7)} semanas`;
+  return `há ${Math.floor(dias / 30)} meses`;
+}
+
+// Filtros da lista (os da obra em andamento primeiro).
+const FILTROS: { valor: StatusProjeto | ''; rotulo: string }[] = [
+  { valor: '', rotulo: 'Todos' },
+  { valor: 'rascunho', rotulo: 'Rascunho' },
+  { valor: 'enviado', rotulo: 'Enviado ao cliente' },
+  { valor: 'aprovado', rotulo: 'Aprovado' },
+  { valor: 'concluido', rotulo: 'Concluído' },
+  { valor: 'recusado', rotulo: 'Recusado' },
+];
 
 export default function ListaProjetos() {
   const router = useRouter();
@@ -21,6 +42,8 @@ export default function ListaProjetos() {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [busca, setBusca] = useState('');
+  const [status, setStatus] = useState<StatusProjeto | ''>('');
+  const statusAtual = useRef<StatusProjeto | ''>('');
   const buscaAtual = useRef('');
   const ultimaConsulta = useRef(0);
 
@@ -28,7 +51,7 @@ export default function ListaProjetos() {
     const id = ++ultimaConsulta.current;
     setErro(null);
     try {
-      const lista = await listarProjetos(termo);
+      const lista = await listarProjetos(termo, statusAtual.current || undefined);
       if (id === ultimaConsulta.current) setProjetos(lista); // ignora respostas atrasadas
     } catch (e: any) {
       if (id === ultimaConsulta.current) setErro(e?.message ?? 'Sem conexão com o servidor.');
@@ -43,6 +66,13 @@ export default function ListaProjetos() {
       carregar(buscaAtual.current);
     }, [carregar])
   );
+
+  function escolherStatus(s: StatusProjeto | '') {
+    statusAtual.current = s;
+    setStatus(s);
+    setCarregando(true);
+    carregar(buscaAtual.current);
+  }
 
   // Espera parar de digitar antes de buscar.
   useEffect(() => {
@@ -83,6 +113,14 @@ export default function ListaProjetos() {
         </Pressable>
       </View>
 
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filtrosBarra} contentContainerStyle={styles.filtros}>
+        {FILTROS.map((f) => (
+          <Pressable key={f.valor || 'todos'} onPress={() => escolherStatus(f.valor)} style={[styles.filtro, status === f.valor && styles.filtroAtivo]}>
+            <Text style={[styles.filtroTexto, status === f.valor && { color: '#FFFFFF' }]}>{f.rotulo}</Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+
       {carregando ? (
         <ActivityIndicator style={{ marginTop: 40 }} color={cor.marca} />
       ) : (
@@ -117,6 +155,11 @@ export default function ListaProjetos() {
               >
                 <View style={styles.cartaoTopo}>
                   {!!p.numero && <Text style={styles.numero}>Nº {p.numero}</Text>}
+                  <View style={styles.data}>
+                    <MaterialCommunityIcons name="clock-outline" size={14} color={cor.marca} />
+                    <Text style={styles.dataTexto}>{dataCurta(p.atualizado_em)}</Text>
+                    <Text style={styles.dataRelativa}>· {haQuanto(p.atualizado_em)}</Text>
+                  </View>
                   <View style={[styles.etiqueta, { backgroundColor: st.cor + '1A' }]}>
                     <Text style={[styles.etiquetaTexto, { color: st.cor }]}>{st.rotulo}</Text>
                   </View>
@@ -138,7 +181,7 @@ export default function ListaProjetos() {
                 )}
                 <View style={styles.rodape}>
                   <Text style={styles.detalhe}>
-                    {pecas} {pecas === 1 ? 'peça' : 'peças'} · atualizado em {dataCurta(p.atualizado_em)}
+                    {pecas} {pecas === 1 ? 'peça' : 'peças'}
                   </Text>
                   <MaterialCommunityIcons name="chevron-right" size={22} color={cor.textoSuave} />
                 </View>
@@ -173,6 +216,14 @@ const styles = StyleSheet.create({
     padding: espaco.lg, ...sombra,
   },
   cartaoTopo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  filtrosBarra: { flexGrow: 0, flexShrink: 0, minHeight: 44 },
+  filtros: { gap: 8, paddingHorizontal: espaco.lg, paddingBottom: espaco.sm, maxWidth: LARGURA_FORMULARIO },
+  filtro: { borderWidth: 1, borderColor: cor.borda, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7, backgroundColor: cor.cartao },
+  filtroAtivo: { backgroundColor: cor.marca, borderColor: cor.marca },
+  filtroTexto: { color: cor.texto, fontSize: 14, fontWeight: '600' },
+  data: { flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 10 },
+  dataTexto: { color: cor.marca, fontSize: 13, fontWeight: '800' },
+  dataRelativa: { color: cor.textoSuave, fontSize: 13 },
   numero: { color: cor.textoSuave, fontSize: 13, fontWeight: '700' },
   etiqueta: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3, marginLeft: 'auto' },
   etiquetaTexto: { fontSize: 12, fontWeight: '700' },

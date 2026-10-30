@@ -199,6 +199,8 @@ export async function parcelar(dados: {
   parcelas: number;
   primeiro_vencimento: string;
   observacoes: string;
+  projeto?: string; // compra ligada a uma obra
+  vencimentos?: string[]; // uma data por parcela (aaaa-mm-dd)
 }): Promise<Lancamento[]> {
   const res = await apiFetch(`${BASE}parcelar/`, {
     method: 'POST',
@@ -288,4 +290,23 @@ export function textoCondicao(c: Condicao, total: number): string {
   const parcelas = `${v.parcelas}x de ${reais(v.valorParcela)}`;
   if (c.tipo === 'entrada') return `${reais(v.entrada)} de entrada + ${parcelas}`;
   return `${v.parcelas > 1 ? 'até ' : ''}${parcelas}`;
+}
+
+// ---------- DRE (Pro) ----------
+
+export type DRE = {
+  receitas: string;
+  custo_material: string;
+  lucro_bruto: string;
+  margem_bruta: string | null;
+  despesas_operacionais: { categoria: string; valor: string }[];
+  total_despesas_operacionais: string;
+  resultado: string;
+  margem_liquida: string | null;
+  obras: { projeto: string; numero: number | null; nome: string; cliente: string; recebido: string; gasto: string; lucro: string; margem: string | null }[];
+};
+
+/** DRE em regime de caixa (o que entrou e saiu no período). */
+export async function obterDRE(filtro: FiltroPeriodo): Promise<DRE> {
+  return ler(await apiFetch(`/financeiro/dre/?${paramsPeriodo(filtro)}`), 'Não foi possível carregar o DRE.');
 }

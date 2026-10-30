@@ -127,6 +127,15 @@ function Financeiro() {
 
   return (
     <ScrollView contentContainerStyle={styles.conteudo}>
+      <Pressable style={styles.atalhoDre} onPress={() => router.push('/financeiro/dre')} accessibilityRole="button">
+        <MaterialCommunityIcons name="chart-box-outline" size={22} color={cor.marca} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.atalhoDreTitulo}>DRE: resultado do mês</Text>
+          <Text style={styles.atalhoDreTexto}>Receitas, custos, despesas e o lucro de cada obra.</Text>
+        </View>
+        <Text style={styles.link}>Abrir ›</Text>
+      </Pressable>
+
       <View style={styles.modos}>
         {([['hoje', 'Hoje'], ['periodo', 'Período'], ['mes', 'Mês']] as [Modo, string][]).map(([m, r]) => (
           <Pressable key={m} onPress={() => { setCarregando(true); setModo(m); }} style={[styles.modo, modo === m && styles.modoAtivo]}>
@@ -302,6 +311,12 @@ function Bloco({ rotulo, valor, detalhe, cor: c, icone }: { rotulo: string; valo
 const styles = StyleSheet.create({
   tela: { flex: 1, backgroundColor: cor.fundo },
   conteudo: { padding: espaco.lg, gap: espaco.md, width: '100%', maxWidth: LARGURA_FORMULARIO, alignSelf: 'center', paddingBottom: espaco.xxl },
+  atalhoDre: {
+    flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: cor.cartao, borderRadius: raio.cartao,
+    borderWidth: 1, borderColor: cor.borda, padding: espaco.md,
+  },
+  atalhoDreTitulo: { color: cor.texto, fontSize: 15, fontWeight: '800' },
+  atalhoDreTexto: { color: cor.textoSuave, fontSize: 12 },
   modos: { flexDirection: 'row', backgroundColor: cor.cartao, borderRadius: raio.botao, borderWidth: 1, borderColor: cor.borda, padding: 3 },
   modo: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: 6 },
   modoAtivo: { backgroundColor: cor.marca },
