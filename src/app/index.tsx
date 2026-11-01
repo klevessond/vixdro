@@ -267,6 +267,27 @@ export default function Inicio() {
               onAcao={ir('/configuracoes/plano')}
             />
           )}
+          {painel?.estoque?.disponivel ? (
+            <Cartao
+              icone="package-variant"
+              titulo="Estoque"
+              rotulo="Itens com saldo"
+              valor={String(painel.estoque.itens ?? 0)}
+              extra={painel.estoque.abaixo_minimo ? { valor: String(painel.estoque.abaixo_minimo), rotulo: 'abaixo do mínimo' } : undefined}
+              descricao="Saldo dos materiais, pedidos recebidos e baixa nas obras."
+              acao="Abrir"
+              onAcao={ir('/estoque')}
+            />
+          ) : (
+            <Cartao
+              icone="package-variant"
+              titulo="Estoque"
+              rotulo="Recurso do plano Pro"
+              descricao="Saldo dos materiais, com baixa automática conforme as peças ficam prontas."
+              acao="Conhecer"
+              onAcao={ir('/configuracoes/plano')}
+            />
+          )}
         </Grade>
       </View>
     </ScrollView>

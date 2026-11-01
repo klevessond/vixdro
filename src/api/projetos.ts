@@ -91,6 +91,10 @@ export type ItemCompra = {
   comprimento_mm: number | null;
   proprio?: boolean; // item próprio: comprado fora do pedido ao fornecedor
   fornecedor?: string; // nome do fornecedor do item
+  // Estoque (Pro): quanto há disponível deste item.
+  estoque_disponivel?: string; // unidade de estoque (m, m², un)
+  estoque_disponivel_compra?: string; // em unidades de compra (barras, para perfis)
+  estoque_texto?: string; // "36 m (≈ 6 barras)"
   quantidade_compra: string;
   quantidade_estoque: string; // sai do estoque do vidraceiro
   quantidade_pedir: string; // o que vai para o pedido ao fornecedor

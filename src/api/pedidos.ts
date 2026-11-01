@@ -19,6 +19,7 @@ export type Pedido = {
   erro: string;
   criado_em: string;
   enviado_em: string | null;
+  recebido?: boolean; // mercadoria já entrou no estoque
   itens: { codigo: string; descricao: string; unidade: string; quantidade: string; preco_unitario: string; subtotal: string }[];
 };
 

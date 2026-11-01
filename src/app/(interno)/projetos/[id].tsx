@@ -50,6 +50,7 @@ import { AjustesOrcamento, ValoresAjuste } from '@/components/projetos/AjustesOr
 import { EditorPeca } from '@/components/projetos/EditorPeca';
 import { MedicaoProjeto } from '@/components/projetos/MedicaoProjeto';
 import { Condicao, listarCondicoes } from '@/api/financeiro';
+import { receberPedido } from '@/api/estoque';
 import { BotaoListaCompraPdf } from '@/components/projetos/BotaoListaCompraPdf';
 import { compartilharPdf } from '@/pdf/gerarPdf';
 import { QuaisItens, htmlListaCompra, tituloListaCompra } from '@/pdf/listaCompraHtml';
@@ -323,6 +324,24 @@ export default function EditorProjeto() {
     window.addEventListener('beforeunload', aviso);
     return () => window.removeEventListener('beforeunload', aviso);
   }, [alterado]);
+
+  /** A mercadoria do pedido chegou: entra no estoque (Pro), uma única vez. */
+  function mercadoriaRecebida(p: Pedido) {
+    Alert.alert('Mercadoria recebida', `Dar entrada no estoque dos ${p.itens.length} itens deste pedido?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Dar entrada',
+        onPress: async () => {
+          try {
+            await receberPedido(p.id);
+            setPedidos(await listarPedidos(projeto.id));
+          } catch (e: any) {
+            Alert.alert('Não foi possível dar entrada', e?.message ?? 'Tente novamente.');
+          }
+        },
+      },
+    ]);
+  }
 
   /** Lista de compra em PDF (para outro fornecedor ou para conferir a compra). */
   async function gerarListaCompra(quais: QuaisItens, comPrecos: boolean) {
@@ -829,6 +848,17 @@ export default function EditorProjeto() {
                         {doEstoque ? `→ pedir ${fmt(numero(x.quantidade_pedir), 3)}` : ''}
                       </Text>
                     </View>
+                    {!!x.estoque_texto && numero(x.estoque_disponivel ?? '0') > 0 && !congelado && (
+                      <Pressable
+                        hitSlop={6}
+                        onPress={() =>
+                          // Usa o que houver em estoque, até o que o projeto precisa.
+                          mudarEstoque(x.item, String(Math.min(numero(x.estoque_disponivel_compra ?? '0'), numero(x.quantidade_compra))).replace('.', ','))
+                        }
+                      >
+                        <Text style={styles.emEstoque}>Em estoque: {x.estoque_texto} · usar</Text>
+                      </Pressable>
+                    )}
                   </View>
                 );
               })}
@@ -900,6 +930,15 @@ export default function EditorProjeto() {
                   {p.status_texto}
                 </Text>
                 {!!p.erro && <Text style={styles.nota}>{p.erro}</Text>}
+                {pro && !['erro', 'cancelado', 'enviando'].includes(p.status) && (
+                  p.recebido ? (
+                    <Text style={styles.recebido}>✓ Mercadoria recebida (entrou no estoque)</Text>
+                  ) : (
+                    <Pressable style={[styles.botaoContorno, { marginTop: 10 }]} onPress={() => mercadoriaRecebida(p)}>
+                      <Text style={styles.link}>Mercadoria recebida: dar entrada no estoque</Text>
+                    </Pressable>
+                  )
+                )}
                 {p.status !== 'cancelado' && (
                   <Pressable style={[styles.botaoContorno, { marginTop: 10 }]} onPress={() => acaoPedido(p)} disabled={ocupadoPedido !== null}>
                     {ocupadoPedido === p.id ? (
@@ -946,6 +985,9 @@ export default function EditorProjeto() {
             // Sugestão: o que os itens próprios (comprados fora do pedido) custam.
             custoItensProprios={(calculo?.lista_compra ?? []).filter((x) => x.proprio).reduce((t, x) => t + numero(x.custo_pedir), 0)}
             atualizarEm={versaoCompras}
+            itensProprios={(calculo?.lista_compra ?? [])
+              .filter((x) => x.proprio && numero(x.quantidade_pedir) > 0)
+              .map((x) => ({ item: x.item, descricao: x.descricao, quantidade: x.quantidade_pedir, texto: `${fmt(numero(x.quantidade_pedir), 3)} ${x.unidade_compra}` }))}
           />
         )}
 
@@ -1038,6 +1080,8 @@ function LinhaInterna({ rotulo, valor }: { rotulo: string; valor: string }) {
 const styles = StyleSheet.create({
   tela: { flex: 1, backgroundColor: COR.fundo },
   grade: { flexDirection: 'row', gap: 12 },
+  recebido: { color: '#1E6B3A', fontSize: 13, fontWeight: '700', marginTop: 8 },
+  emEstoque: { color: COR.borda, fontSize: 13, fontWeight: '700', marginTop: 4 },
   salvoAgora: { color: '#1E6B3A', fontSize: 14, fontWeight: '700', textAlign: 'center', marginTop: 8 },
   naoSalvo: { color: '#8A5A00', fontSize: 13, textAlign: 'center', marginTop: 8 },
   formas: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 6 },
