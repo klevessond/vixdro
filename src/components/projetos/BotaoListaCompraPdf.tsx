@@ -16,7 +16,7 @@ type Props = { gerar: (quais: QuaisItens, comPrecos: boolean) => Promise<void> }
 const OPCOES: { valor: QuaisItens; rotulo: string; ajuda: string }[] = [
   { valor: 'todos', rotulo: 'Todos os itens', ajuda: 'Catálogo do fornecedor e itens próprios, separados.' },
   { valor: 'proprios', rotulo: 'Só os itens próprios', ajuda: 'O que você compra fora do pedido (vidro, por exemplo).' },
-  { valor: 'catalogo', rotulo: 'Só os do catálogo', ajuda: 'Os mesmos itens do pedido à Alumínio Seridó.' },
+  { valor: 'catalogo', rotulo: 'Só os do catálogo', ajuda: 'Os mesmos itens do pedido ao fornecedor.' },
 ];
 
 export function BotaoListaCompraPdf({ gerar }: Props) {
@@ -46,7 +46,9 @@ export function BotaoListaCompraPdf({ gerar }: Props) {
         <View style={styles.fundo}>
           <View style={styles.caixa}>
             <Text style={styles.titulo}>Lista de compra em PDF</Text>
-            <Text style={styles.ajuda}>Para pedir a outro fornecedor ou conferir a compra. Não leva os dados do cliente.</Text>
+            <Text style={styles.ajuda}>
+              Para comprar em qualquer fornecedor ou conferir a compra. Não leva o nome do fornecedor nem os dados do cliente.
+            </Text>
 
             <Text style={styles.rotulo}>Quais itens</Text>
             {OPCOES.map((o) => (

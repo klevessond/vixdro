@@ -103,3 +103,64 @@ export async function receberPedido(pedidoId: string) {
   const res = await apiFetch(`/pedidos/${pedidoId}/receber/`, { method: 'POST' });
   return ler<{ entradas: number; ja_recebido: boolean }>(res, 'Não foi possível dar entrada no pedido.');
 }
+
+// ---------- Peças prontas ----------
+
+export type PecaPronta = {
+  id: string;
+  produto: string | null;
+  nome: string;
+  largura_mm: number;
+  altura_mm: number;
+  observacao: string; // ex: cor, lado de abertura
+  saldo: number;
+  custo_unitario: string;
+};
+
+export type MovimentoPeca = {
+  id: string;
+  quantidade: number;
+  motivo: 'producao' | 'obra' | 'contagem' | 'saida';
+  motivo_texto: string;
+  observacao: string;
+  projeto: string | null;
+  custo_unitario: string | null;
+  criado_em: string;
+};
+
+export type SimulacaoProducao = {
+  materiais: { item: number; descricao: string; precisa: string; tem: string; falta: boolean }[];
+  custo_total: string;
+  custo_unitario: string;
+  falta_algum: boolean;
+};
+
+export async function listarPecasProntas(filtro: { produto?: string; largura_mm?: number; altura_mm?: number; com_saldo?: boolean } = {}) {
+  const p = new URLSearchParams();
+  if (filtro.produto) p.set('produto', filtro.produto);
+  if (filtro.largura_mm) p.set('largura_mm', String(filtro.largura_mm));
+  if (filtro.altura_mm) p.set('altura_mm', String(filtro.altura_mm));
+  if (filtro.com_saldo) p.set('com_saldo', '1');
+  return ler<PecaPronta[]>(await apiFetch(`/estoque/pecas/?${p}`), 'Não foi possível carregar as peças prontas.');
+}
+
+export async function obterPecaPronta(id: string) {
+  return ler<PecaPronta & { movimentos: MovimentoPeca[] }>(await apiFetch(`/estoque/pecas/${id}/`), 'Não foi possível abrir a peça.');
+}
+
+/** Contagem (o saldo passa a ser o contado) ou saída (vendida/descartada). */
+export async function movimentarPeca(id: string, motivo: 'contagem' | 'saida', quantidade: number, observacao = '') {
+  const res = await apiFetch(`/estoque/pecas/${id}/`, { method: 'POST', body: JSON.stringify({ motivo, quantidade, observacao }) });
+  return ler<PecaPronta>(res, 'Não foi possível registrar.');
+}
+
+type DadosProducao = { produto: string; largura_mm: number; altura_mm: number; quantidade: number; observacao?: string };
+
+export async function simularProducao(d: DadosProducao) {
+  return ler<SimulacaoProducao>(await apiFetch('/estoque/pecas/simular/', { method: 'POST', body: JSON.stringify(d) }), 'Não foi possível simular.');
+}
+
+/** Tira os materiais do estoque e põe as peças prontas. */
+export async function produzirPecas(d: DadosProducao) {
+  return ler<PecaPronta>(await apiFetch('/estoque/pecas/produzir/', { method: 'POST', body: JSON.stringify(d) }), 'Não foi possível registrar a produção.');
+}

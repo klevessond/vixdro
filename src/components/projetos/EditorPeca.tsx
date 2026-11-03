@@ -3,6 +3,8 @@
 // Uma peça do projeto: nome, medidas, quantidade e os itens copiados do
 // modelo. Mudar um item aqui vale só para esta peça.
 
+import { PecaPronta, listarPecasProntas } from '@/api/estoque';
+import { usePlano } from '@/hooks/usePlano';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import {
@@ -59,6 +61,10 @@ export function EditorPeca({ peca, nova, onSalvar, onRemover, onFechar }: Props)
   const [itens, setItens] = useState<Componente[]>([]);
   const [seletorAberto, setSeletorAberto] = useState(false);
   const [edicao, setEdicao] = useState<EdicaoItem | null>(null);
+  // Peças prontas iguais (mesmo produto e medidas) no estoque (Pro).
+  const { pro } = usePlano();
+  const [prontas, setProntas] = useState<PecaPronta[]>([]);
+  const [prontaUsada, setProntaUsada] = useState<string | null>(null);
 
   useEffect(() => {
     if (!peca) return;
@@ -68,13 +74,36 @@ export function EditorPeca({ peca, nova, onSalvar, onRemover, onFechar }: Props)
     setAltura(mmParaMetros(peca.altura_mm));
     setQuantidade(String(peca.quantidade || 1));
     setItens(peca.itens);
+    setProntaUsada(peca.peca_pronta ?? null);
   }, [peca]);
+
+  // Procura peças prontas deste produto nestas medidas (espera parar de digitar).
+  const mmL = metrosParaMm(largura);
+  const mmA = metrosParaMm(altura);
+  useEffect(() => {
+    if (!pro || !peca?.produto || !mmL || !mmA) {
+      setProntas([]);
+      return;
+    }
+    const t = setTimeout(() => {
+      listarPecasProntas({ produto: peca.produto!, largura_mm: mmL, altura_mm: mmA, com_saldo: true })
+        .then((lista) => {
+          setProntas(lista);
+          // Medida mudou e a pronta escolhida não serve mais: deixa de usar.
+          setProntaUsada((atual) => (atual && !lista.some((x) => x.id === atual) && atual !== peca.peca_pronta ? null : atual));
+        })
+        .catch(() => setProntas([]));
+    }, 400);
+    return () => clearTimeout(t);
+  }, [pro, peca?.produto, mmL, mmA]);
+  const pronta = prontas.find((x) => x.id === prontaUsada);
 
   if (!peca) return null;
 
   const L = metrosParaMm(largura);
   const A = metrosParaMm(altura);
   const Q = parseInt(quantidade, 10) || 1;
+
 
   function faltaMedida(c: Componente): boolean {
     const usaL = numero(c.coef_largura) !== 0 || numero(c.coef_area) !== 0;
@@ -152,7 +181,7 @@ export function EditorPeca({ peca, nova, onSalvar, onRemover, onFechar }: Props)
     if (usaAltura && !A) {
       return Alert.alert('Falta a altura', `O item "${usaAltura.item_detalhe.descricao}" usa a altura no cálculo.`);
     }
-    onSalvar({ ...peca!, nome: nome.trim(), largura_mm: L, altura_mm: A, quantidade: Q, itens });
+    onSalvar({ ...peca!, nome: nome.trim(), largura_mm: L, altura_mm: A, quantidade: Q, itens, peca_pronta: prontaUsada });
   }
 
   function confirmarRemocao() {
@@ -223,6 +252,34 @@ export function EditorPeca({ peca, nova, onSalvar, onRemover, onFechar }: Props)
               />
             </View>
           </View>
+
+          {(prontas.length > 0 || prontaUsada) && (
+            <View style={[styles.pronta, prontaUsada && styles.prontaUsada]}>
+              {prontaUsada ? (
+                <>
+                  <Text style={styles.prontaTitulo}>✓ Do estoque de peças prontas</Text>
+                  <Text style={styles.prontaTexto}>
+                    Não entra na lista de compra. Ao concluir a peça, sai {Q} {Q === 1 ? 'pronta' : 'prontas'} do estoque.
+                    {pronta && Q > pronta.saldo ? ` Atenção: só há ${pronta.saldo} em estoque.` : ''}
+                  </Text>
+                  <Pressable onPress={() => setProntaUsada(null)} hitSlop={6}>
+                    <Text style={styles.prontaLink}>Não usar as prontas</Text>
+                  </Pressable>
+                </>
+              ) : (
+                prontas.map((x) => (
+                  <View key={x.id}>
+                    <Text style={styles.prontaTitulo}>
+                      Você tem {x.saldo} {x.saldo === 1 ? 'pronta' : 'prontas'} desta peça{x.observacao ? ` (${x.observacao})` : ''}
+                    </Text>
+                    <Pressable onPress={() => setProntaUsada(x.id)} hitSlop={6}>
+                      <Text style={styles.prontaLink}>Usar do estoque de prontas</Text>
+                    </Pressable>
+                  </View>
+                ))
+              )}
+            </View>
+          )}
 
           <Text style={styles.secao}>Itens desta peça</Text>
           <Text style={styles.ajuda}>
@@ -329,6 +386,11 @@ const styles = StyleSheet.create({
   },
   voltarTexto: { color: COR.borda, fontSize: 15, fontWeight: '700' },
   acoes: { flexDirection: 'row', gap: 10, marginTop: 24 },
+  pronta: { borderWidth: 1, borderColor: '#F0D9A8', backgroundColor: '#FFF8E8', borderRadius: 8, padding: 12, marginTop: 16, gap: 6 },
+  prontaUsada: { borderColor: '#B8D8CF', backgroundColor: '#E6EFED' },
+  prontaTitulo: { color: COR.tinta, fontSize: 15, fontWeight: '700' },
+  prontaTexto: { color: COR.tintaSuave, fontSize: 13 },
+  prontaLink: { color: COR.borda, fontSize: 14, fontWeight: '700' },
   cancelar: {
     borderWidth: 1.5, borderColor: COR.borda, borderRadius: 6, paddingVertical: 14, paddingHorizontal: 20,
     alignItems: 'center', justifyContent: 'center',

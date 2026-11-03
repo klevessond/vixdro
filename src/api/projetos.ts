@@ -16,6 +16,8 @@ export type Peca = {
   quantidade: number;
   observacao: string;
   itens: Componente[];
+  // Peça tirada do estoque de prontas (id): não entra na lista de compra.
+  peca_pronta?: string | null;
   // Acompanhamento da obra: peça produzida/instalada.
   concluida?: boolean;
   concluida_em?: string | null;
@@ -91,6 +93,8 @@ export type ItemCompra = {
   comprimento_mm: number | null;
   proprio?: boolean; // item próprio: comprado fora do pedido ao fornecedor
   fornecedor?: string; // nome do fornecedor do item
+  tipo?: string; // perfil, acessorio, vedacao, vidro, outro
+  necessario_m?: string | null; // perfis: metros necessários, com a perda de corte
   // Estoque (Pro): quanto há disponível deste item.
   estoque_disponivel?: string; // unidade de estoque (m, m², un)
   estoque_disponivel_compra?: string; // em unidades de compra (barras, para perfis)

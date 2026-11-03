@@ -59,6 +59,15 @@ function Estoque() {
         <Text style={styles.totalNota}>Pelo custo médio das entradas.</Text>
       </View>
 
+      <Pressable style={styles.atalho} onPress={() => router.push('/estoque/pecas')} accessibilityRole="button">
+        <MaterialCommunityIcons name="window-closed-variant" size={22} color={cor.marca} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.atalhoTitulo}>Peças prontas</Text>
+          <Text style={styles.atalhoTexto}>Produza para o estoque e use nos projetos.</Text>
+        </View>
+        <Text style={styles.atalhoSeta}>›</Text>
+      </Pressable>
+
       <View style={styles.topo}>
         <View style={styles.busca}>
           <MaterialCommunityIcons name="magnify" size={20} color={cor.textoSuave} />
@@ -129,6 +138,10 @@ const styles = StyleSheet.create({
   totalValor: { color: '#FFFFFF', fontSize: 26, fontWeight: '800', marginTop: 2 },
   totalNota: { color: cor.textoSobreMarcaSuave, fontSize: 12 },
   topo: { flexDirection: 'row', gap: espaco.sm },
+  atalho: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: cor.cartao, borderRadius: raio.cartao, borderWidth: 1, borderColor: cor.borda, padding: espaco.md },
+  atalhoTitulo: { color: cor.texto, fontSize: 15, fontWeight: '800' },
+  atalhoTexto: { color: cor.textoSuave, fontSize: 12 },
+  atalhoSeta: { color: cor.marca, fontSize: 24, fontWeight: '700' },
   busca: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: cor.cartao, borderWidth: 1, borderColor: cor.borda, borderRadius: raio.campo, paddingHorizontal: 12 },
   buscaInput: { flex: 1, paddingVertical: 11, fontSize: 15, color: cor.texto },
   novo: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: cor.marca, borderRadius: raio.botao, paddingHorizontal: 14 },

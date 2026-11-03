@@ -662,7 +662,10 @@ export default function EditorProjeto() {
                   />
                 </Pressable>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.pecaNome, p.concluida && styles.pecaConcluida]}>{p.nome}</Text>
+                  <Text style={[styles.pecaNome, p.concluida && styles.pecaConcluida]}>
+                    {p.nome}
+                    {p.peca_pronta ? <Text style={styles.tagPronta}>  · do estoque de prontas</Text> : null}
+                  </Text>
                   <Text style={styles.pecaDetalhe}>
                     {[medidasTexto(p.largura_mm, p.altura_mm), `${p.itens.length} ${p.itens.length === 1 ? 'item' : 'itens'}`]
                       .filter(Boolean)
@@ -826,7 +829,7 @@ export default function EditorProjeto() {
                       <View style={{ flex: 1 }}>
                         <Text style={styles.resultadoNome}>{x.descricao}</Text>
                         <Text style={styles.resultadoDetalhe}>
-                          {x.codigo} · precisa de {textoCompra(x)}
+                          {x.codigo} · precisa de {x.necessario_m ? `${fmt(numero(x.necessario_m))} m · ` : ''}{textoCompra(x)}
                           {x.sobra_m !== null ? ` · sobra ${fmt(numero(x.sobra_m))} m` : ''}
                           {!x.item_ativo ? ' · saiu de linha' : ''}
                         </Text>
@@ -1080,6 +1083,7 @@ function LinhaInterna({ rotulo, valor }: { rotulo: string; valor: string }) {
 const styles = StyleSheet.create({
   tela: { flex: 1, backgroundColor: COR.fundo },
   grade: { flexDirection: 'row', gap: 12 },
+  tagPronta: { color: '#1E5B57', fontSize: 12, fontWeight: '700' },
   recebido: { color: '#1E6B3A', fontSize: 13, fontWeight: '700', marginTop: 8 },
   emEstoque: { color: COR.borda, fontSize: 13, fontWeight: '700', marginTop: 4 },
   salvoAgora: { color: '#1E6B3A', fontSize: 14, fontWeight: '700', textAlign: 'center', marginTop: 8 },

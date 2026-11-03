@@ -1,9 +1,10 @@
 // src/pdf/listaCompraHtml.ts
 //
-// Lista de compra em PDF: os itens a comprar para um projeto, separados por
-// fornecedor, já descontando o que sai do estoque. Pode ir para outro
-// fornecedor (pedido ou cotação), então NÃO leva os dados do cliente, só a
-// referência do orçamento. Com ou sem preços (sem preços: para cotação).
+// Lista de compra em PDF: os itens a comprar para um projeto, separados pelo
+// TIPO do material (perfis, acessórios...), já descontando o que sai do
+// estoque. Pode ser usada para comprar em qualquer lugar, então NÃO leva o
+// nome do fornecedor nem os dados do cliente, só a referência do orçamento.
+// Com ou sem preços (sem preços: para cotação).
 
 import type { Vidraceiro } from '@/api/auth';
 import type { CalculoProjeto, ItemCompra, Projeto } from '@/api/projetos';
@@ -60,14 +61,17 @@ export function htmlListaCompra(d: DadosListaCompra): string {
   const { projeto, vidraceiro, logo, comPrecos } = d;
   const itens = filtrarItens(d.calculo, d.quais);
 
-  // Agrupa por fornecedor (itens próprios ficam juntos, como "outros fornecedores").
+  // Agrupa pelo tipo do material, na ordem em que se compra (perfis primeiro).
+  const ORDEM: [string, string][] = [
+    ['perfil', 'Perfis'], ['acessorio', 'Acessórios'], ['vedacao', 'Vedações'], ['vidro', 'Vidros'], ['outro', 'Outros'],
+  ];
   const grupos = new Map<string, ItemCompra[]>();
-  for (const x of itens) {
-    const nome = x.proprio ? 'Outros fornecedores (itens próprios)' : x.fornecedor ?? 'Fornecedor';
-    grupos.set(nome, [...(grupos.get(nome) ?? []), x]);
+  for (const [tipo, nome] of ORDEM) {
+    const lista = itens.filter((x) => (x.tipo || 'outro') === tipo || (tipo === 'outro' && !ORDEM.some(([t]) => t === x.tipo)));
+    if (lista.length) grupos.set(nome, lista);
   }
 
-  const tabelas = [...grupos.entries()].map(([fornecedor, lista]) => {
+  const tabelas = [...grupos.entries()].map(([grupo, lista]) => {
     const total = lista.reduce((t, x) => t + (parseFloat(x.custo_pedir) || 0), 0);
     const linhas = lista.map((x) => {
       const doEstoque = parseFloat(x.quantidade_estoque) || 0;
@@ -78,11 +82,11 @@ export function htmlListaCompra(d: DadosListaCompra): string {
         ${comPrecos ? `<td class="dir">${reais(x.preco_unitario)}</td><td class="dir">${reais(x.custo_pedir)}</td>` : ''}
       </tr>`;
     });
-    return `<h2>${esc(fornecedor)}</h2>
+    return `<h2>${esc(grupo)}</h2>
       <table>
         <thead><tr><th>Código</th><th>Descrição</th><th class="qtd">Quantidade</th>${comPrecos ? '<th class="dir">Preço unit.</th><th class="dir">Total</th>' : ''}</tr></thead>
         <tbody>${linhas.join('')}</tbody>
-        ${comPrecos ? `<tfoot><tr><td colspan="4" class="dir">Total ${esc(fornecedor)}</td><td class="dir">${reais(total)}</td></tr></tfoot>` : ''}
+        ${comPrecos ? `<tfoot><tr><td colspan="4" class="dir">Total ${esc(grupo).toLowerCase()}</td><td class="dir">${reais(total)}</td></tr></tfoot>` : ''}
       </table>`;
   });
 
