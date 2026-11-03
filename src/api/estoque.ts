@@ -115,6 +115,9 @@ export type PecaPronta = {
   observacao: string; // ex: cor, lado de abertura
   saldo: number;
   custo_unitario: string;
+  imagem_url: string | null; // a própria ou, sem ela, a do produto
+  miniatura_url: string | null;
+  imagem_propria: boolean;
 };
 
 export type MovimentoPeca = {
@@ -163,4 +166,14 @@ export async function simularProducao(d: DadosProducao) {
 /** Tira os materiais do estoque e põe as peças prontas. */
 export async function produzirPecas(d: DadosProducao) {
   return ler<PecaPronta>(await apiFetch('/estoque/pecas/produzir/', { method: 'POST', body: JSON.stringify(d) }), 'Não foi possível registrar a produção.');
+}
+
+/** Foto própria da peça pronta (sem ela, aparece a do produto). */
+export async function enviarImagemPeca(id: string, base64: string) {
+  const res = await apiFetch(`/estoque/pecas/${id}/imagem/`, { method: 'POST', body: JSON.stringify({ imagem_base64: base64 }) });
+  return ler<PecaPronta>(res, 'Não foi possível enviar a foto.');
+}
+
+export async function removerImagemPeca(id: string) {
+  return ler<PecaPronta>(await apiFetch(`/estoque/pecas/${id}/imagem/`, { method: 'DELETE' }), 'Não foi possível remover a foto.');
 }

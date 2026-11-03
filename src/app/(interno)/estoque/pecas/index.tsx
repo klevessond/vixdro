@@ -6,7 +6,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { PecaPronta, SimulacaoProducao, listarPecasProntas, produzirPecas, simularProducao } from '@/api/estoque';
 import { Produto, listarProdutos, reais } from '@/api/produtos';
@@ -63,6 +63,13 @@ function Pecas() {
         <View style={styles.lista}>
           {pecas.map((p, i) => (
             <Pressable key={p.id} onPress={() => router.push(`/estoque/pecas/${p.id}`)} style={({ pressed }) => [styles.item, i > 0 && styles.divisor, pressed && { backgroundColor: cor.marcaClara }]}>
+              <View style={styles.foto}>
+                {p.miniatura_url ? (
+                  <Image source={{ uri: p.miniatura_url }} style={{ width: '100%', height: '100%' }} />
+                ) : (
+                  <MaterialCommunityIcons name="window-closed-variant" size={26} color={cor.marca} />
+                )}
+              </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.nome}>{p.nome}</Text>
                 <Text style={styles.detalhe}>
@@ -211,6 +218,7 @@ const styles = StyleSheet.create({
   lista: { backgroundColor: cor.cartao, borderRadius: raio.cartao, borderWidth: 1, borderColor: cor.borda, overflow: 'hidden', ...sombra },
   item: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: espaco.lg },
   divisor: { borderTopWidth: 1, borderTopColor: cor.borda },
+  foto: { width: 52, height: 52, borderRadius: 10, backgroundColor: cor.marcaClara, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   nome: { color: cor.texto, fontSize: 15, fontWeight: '800' },
   detalhe: { color: cor.textoSuave, fontSize: 12, marginTop: 2 },
   saldo: { color: cor.texto, fontSize: 17, fontWeight: '800' },

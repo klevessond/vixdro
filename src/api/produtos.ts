@@ -61,6 +61,8 @@ export type Produto = {
   custo_referencia?: string; // custo dos itens numa peça de 1,00 x 1,00 m
   custo_depende_medida?: boolean; // false = custo exato (só quantidades fixas)
   padrao?: boolean; // modelo pronto da equipe: só leitura (dá para criar uma cópia)
+  imagem_url?: string | null; // foto do produto
+  miniatura_url?: string | null;
 };
 
 export type LinhaSimulacao = {
@@ -163,6 +165,16 @@ export async function listarProdutos(): Promise<Produto[]> {
 export async function obterProduto(id: string): Promise<Produto> {
   const res = await apiFetch(`/produtos/${id}/`);
   return lerResposta(res, 'Não foi possível abrir o produto.');
+}
+
+/** Troca a foto do produto (base64 da câmera/galeria). */
+export async function enviarImagemProduto(id: string, base64: string): Promise<Produto> {
+  const res = await apiFetch(`/produtos/${id}/imagem/`, { method: 'POST', body: JSON.stringify({ imagem_base64: base64 }) });
+  return lerResposta<Produto>(res, 'Não foi possível enviar a foto.');
+}
+
+export async function removerImagemProduto(id: string): Promise<Produto> {
+  return lerResposta<Produto>(await apiFetch(`/produtos/${id}/imagem/`, { method: 'DELETE' }), 'Não foi possível remover a foto.');
 }
 
 /** Cria uma cópia própria (ex: de um modelo pronto), que o vidraceiro edita à vontade. */

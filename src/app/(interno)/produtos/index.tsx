@@ -7,7 +7,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { ComponentProps, useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { CATEGORIAS, Categoria, Produto, listarProdutos, reais } from '@/api/produtos';
 import { LARGURA_FORMULARIO, cor, espaco, raio, sombra } from '@/ui/tema';
@@ -108,7 +108,11 @@ export default function ListaProdutos() {
                 style={({ pressed }) => [styles.cartao, pressed && { borderColor: cor.marca }]}
               >
                 <View style={styles.icone}>
-                  <MaterialCommunityIcons name={ICONE[p.categoria] ?? 'shape-outline'} size={30} color={cor.marca} />
+                  {p.miniatura_url ? (
+                    <Image source={{ uri: p.miniatura_url }} style={styles.miniatura} />
+                  ) : (
+                    <MaterialCommunityIcons name={ICONE[p.categoria] ?? 'shape-outline'} size={30} color={cor.marca} />
+                  )}
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.nome} numberOfLines={2}>{p.nome}</Text>
@@ -160,8 +164,9 @@ const styles = StyleSheet.create({
   },
   icone: {
     width: 54, height: 54, borderRadius: raio.icone, backgroundColor: cor.marcaClara,
-    alignItems: 'center', justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
+  miniatura: { width: '100%', height: '100%' },
   nome: { color: cor.texto, fontSize: 17, fontWeight: '800' },
   detalhe: { color: cor.textoSuave, fontSize: 13, marginTop: 3 },
   custo: { alignItems: 'flex-end' },

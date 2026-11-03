@@ -6,7 +6,8 @@ import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-rou
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { MovimentoPeca, PecaPronta, movimentarPeca, obterPecaPronta } from '@/api/estoque';
+import { MovimentoPeca, PecaPronta, enviarImagemPeca, movimentarPeca, obterPecaPronta, removerImagemPeca } from '@/api/estoque';
+import { FotoEditavel } from '@/components/imagem/FotoEditavel';
 import { reais } from '@/api/produtos';
 import { SomentePro } from '@/components/plano/SomentePro';
 import { LARGURA_FORMULARIO, cor, espaco, raio, sombra } from '@/ui/tema';
@@ -58,6 +59,22 @@ function Ficha() {
         <Text style={styles.detalhe}>{metros(peca.largura_mm)} × {metros(peca.altura_mm)} m{peca.observacao ? ` · ${peca.observacao}` : ''}</Text>
         <Text style={styles.saldo}>{peca.saldo} {peca.saldo === 1 ? 'peça' : 'peças'}</Text>
         <Text style={styles.detalhe}>Custo do material: {reais(peca.custo_unitario)} por peça</Text>
+      </View>
+
+      <View style={styles.cartao}>
+        <FotoEditavel
+          url={peca.imagem_url}
+          ajuda={peca.imagem_propria ? 'Foto desta peça.' : 'Sem foto própria, aparece a do produto. Tire uma para mostrar esta peça.'}
+          onEnviar={async (b) => {
+            const p = await enviarImagemPeca(peca.id, b);
+            setPeca((x) => (x ? { ...x, ...p } : x));
+          }}
+          onRemover={peca.imagem_propria ? async () => {
+            const p = await removerImagemPeca(peca.id);
+            setPeca((x) => (x ? { ...x, ...p } : x));
+          } : undefined}
+          textoRemover="Usar a foto do produto"
+        />
       </View>
 
       <View style={styles.cartao}>

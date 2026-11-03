@@ -34,8 +34,11 @@ import {
   salvarProduto,
   simular,
   duplicarProduto,
+  enviarImagemProduto,
+  removerImagemProduto,
 } from '@/api/produtos';
 import { useAuth } from '@/auth/AuthContext';
+import { FotoEditavel } from '@/components/imagem/FotoEditavel';
 import { EditorRegra } from '@/components/produtos/EditorRegra';
 import { SeletorItem } from '@/components/produtos/SeletorItem';
 import { COR } from '@/components/produtos/cores';
@@ -231,6 +234,27 @@ export default function EditorProduto() {
               </View>
             </Pressable>
             <Text style={styles.equipeNota}>Opção visível só para a equipe do Orçaminio. Use só itens do catálogo do fornecedor.</Text>
+          </View>
+        )}
+
+        <Text style={styles.rotulo}>Foto</Text>
+        {novo ? (
+          <Text style={styles.ajuda}>Salve o produto para adicionar a foto.</Text>
+        ) : (
+          <View style={{ marginBottom: 16 }}>
+            <FotoEditavel
+              url={produto.imagem_url}
+              podeEditar={!modelo}
+              ajuda="Aparece na lista de produtos, na escolha do projeto e nas peças prontas."
+              onEnviar={async (b) => {
+                const p = await enviarImagemProduto(produto.id!, b);
+                setProduto((x) => ({ ...x, imagem_url: p.imagem_url, miniatura_url: p.miniatura_url }));
+              }}
+              onRemover={async () => {
+                await removerImagemProduto(produto.id!);
+                setProduto((x) => ({ ...x, imagem_url: null, miniatura_url: null }));
+              }}
+            />
           </View>
         )}
 

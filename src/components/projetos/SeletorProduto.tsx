@@ -3,7 +3,7 @@
 // Escolhe o modelo (produto) que vai virar uma peça do projeto.
 
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { CATEGORIAS, Produto, listarProdutos } from '@/api/produtos';
 import { COR } from '@/components/produtos/cores';
@@ -62,8 +62,10 @@ export function SeletorProduto({ visivel, onSelecionar, onAvulsa, onFechar }: Pr
           renderItem={({ item: p }) => (
             <Pressable
               onPress={() => onSelecionar(p)}
-              style={({ pressed }) => [styles.linha, pressed && { backgroundColor: COR.bordaClara }]}
+              style={({ pressed }) => [styles.linha, styles.linhaFoto, pressed && { backgroundColor: COR.bordaClara }]}
             >
+              {p.miniatura_url ? <Image source={{ uri: p.miniatura_url }} style={styles.miniatura} /> : null}
+              <View style={{ flex: 1 }}>
               <Text style={styles.nome}>
                 {p.nome}
                 {p.padrao ? <Text style={styles.modelo}>  · modelo pronto</Text> : null}
@@ -71,6 +73,7 @@ export function SeletorProduto({ visivel, onSelecionar, onAvulsa, onFechar }: Pr
               <Text style={styles.detalhe}>
                 {ROTULO[p.categoria]} · {p.componentes.length} {p.componentes.length === 1 ? 'item' : 'itens'}
               </Text>
+              </View>
             </Pressable>
           )}
         />
@@ -80,6 +83,8 @@ export function SeletorProduto({ visivel, onSelecionar, onAvulsa, onFechar }: Pr
 }
 
 const styles = StyleSheet.create({
+  linhaFoto: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  miniatura: { width: 48, height: 48, borderRadius: 8, backgroundColor: '#E6EFED' },
   modelo: { color: '#1E5B57', fontSize: 13, fontWeight: '600' },
   tela: { flex: 1, backgroundColor: COR.fundo, paddingTop: 20 },
   topo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 12 },
