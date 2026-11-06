@@ -6,6 +6,7 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
+  Modal,
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
@@ -132,10 +133,19 @@ export default function EditorProduto() {
   const modelo = !!produto.padrao && !equipe;
   const [duplicando, setDuplicando] = useState(false);
 
-  async function criarMinhaVersao() {
+  // Cópia com o nome escolhido (de um modelo pronto ou de um produto próprio).
+  const [nomeCopia, setNomeCopia] = useState<string | null>(null); // null = janela fechada
+
+  function criarMinhaVersao() {
+    setNomeCopia(produto.padrao ? `${produto.nome} (minha versão)` : `${produto.nome} (cópia)`);
+  }
+
+  async function confirmarCopia() {
+    if (!nomeCopia?.trim()) return Alert.alert('Falta o nome', 'Dê um nome para a sua versão.');
     setDuplicando(true);
     try {
-      const copia = await duplicarProduto(produto.id!);
+      const copia = await duplicarProduto(produto.id!, nomeCopia);
+      setNomeCopia(null);
       router.replace(`/produtos/${copia.id}`);
     } catch (e: any) {
       Alert.alert('Não foi possível criar a cópia', e?.message ?? 'Tente novamente.');
@@ -391,11 +401,39 @@ export default function EditorProduto() {
           </Pressable>
         )}
         {!novo && !modelo && (
+          <Pressable style={styles.copiar} onPress={criarMinhaVersao} accessibilityRole="button">
+            <Text style={styles.copiarTexto}>Criar uma cópia deste produto</Text>
+          </Pressable>
+        )}
+        {!novo && !modelo && (
           <Pressable style={styles.excluir} onPress={excluir} accessibilityRole="button">
             <Text style={styles.excluirTexto}>Excluir produto</Text>
           </Pressable>
         )}
       </ScrollView>
+
+      <Modal visible={nomeCopia !== null} transparent animationType="fade" onRequestClose={() => setNomeCopia(null)}>
+        <View style={styles.copiaFundo}>
+          <View style={styles.copiaCaixa}>
+            <Text style={styles.copiaTitulo}>{produto.padrao ? 'Criar minha versão' : 'Criar uma cópia'}</Text>
+            <Text style={styles.ajuda}>
+              A cópia sai com os mesmos itens, regras e foto. Depois, você ajusta o que quiser: troca itens, muda quanto vai
+              em cada peça ou tira a foto de novo.
+            </Text>
+            <Text style={styles.rotulo}>Nome</Text>
+            <TextInput style={styles.input} value={nomeCopia ?? ''} onChangeText={setNomeCopia} autoFocus selectTextOnFocus />
+            <View style={styles.copiaAcoes}>
+              <Pressable style={styles.copiaCancelar} onPress={() => setNomeCopia(null)}>
+                <Text style={styles.copiaCancelarTexto}>Cancelar</Text>
+              </Pressable>
+              <Pressable style={[styles.copiaCriar, duplicando && { opacity: 0.7 }]} onPress={confirmarCopia} disabled={duplicando}>
+                {duplicando ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.copiaCriarTexto}>Criar</Text>}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
 
       <SeletorItem visivel={seletorAberto} onSelecionar={itemEscolhido} onFechar={() => setSeletorAberto(false)} />
       <EditorRegra
@@ -410,6 +448,16 @@ export default function EditorProduto() {
 }
 
 const styles = StyleSheet.create({
+  copiar: { alignItems: 'center', paddingVertical: 12, marginTop: 8 },
+  copiarTexto: { color: '#1E5B57', fontSize: 15, fontWeight: '700' },
+  copiaFundo: { flex: 1, backgroundColor: 'rgba(22,41,43,0.45)', justifyContent: 'center', padding: 20 },
+  copiaCaixa: { backgroundColor: '#FFFFFF', borderRadius: 14, padding: 22, width: '100%', maxWidth: 480, alignSelf: 'center', gap: 6 },
+  copiaTitulo: { color: '#16292B', fontSize: 19, fontWeight: '800' },
+  copiaAcoes: { flexDirection: 'row', gap: 10, marginTop: 16 },
+  copiaCancelar: { borderWidth: 1.5, borderColor: '#1E5B57', borderRadius: 8, paddingVertical: 12, paddingHorizontal: 18, alignItems: 'center' },
+  copiaCancelarTexto: { color: '#1E5B57', fontSize: 15, fontWeight: '700' },
+  copiaCriar: { flex: 1, backgroundColor: '#1E5B57', borderRadius: 8, paddingVertical: 12, alignItems: 'center' },
+  copiaCriarTexto: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
   equipe: { borderWidth: 1, borderColor: '#C9DCD8', borderRadius: 12, padding: 14, marginBottom: 20, backgroundColor: '#FFFFFF' },
   equipeAtivo: { borderColor: '#1E5B57', borderWidth: 2, backgroundColor: '#E6EFED' },
   equipeLinha: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },

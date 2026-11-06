@@ -18,6 +18,9 @@ export type Peca = {
   itens: Componente[];
   // Peça tirada do estoque de prontas (id): não entra na lista de compra.
   peca_pronta?: string | null;
+  // Foto do produto de origem (só leitura, vem do servidor).
+  produto_imagem_url?: string | null;
+  produto_miniatura_url?: string | null;
   // Acompanhamento da obra: peça produzida/instalada.
   concluida?: boolean;
   concluida_em?: string | null;
@@ -247,6 +250,9 @@ export function pecaDoProduto(produto: Produto): Peca {
     quantidade: 1,
     observacao: '',
     itens: produto.componentes.map((c) => ({ ...c })),
+    // A foto já aparece na peça antes de o projeto ser salvo.
+    produto_imagem_url: produto.imagem_url ?? null,
+    produto_miniatura_url: produto.miniatura_url ?? null,
   };
 }
 

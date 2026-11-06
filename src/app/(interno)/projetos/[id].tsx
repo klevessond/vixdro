@@ -51,6 +51,7 @@ import { EditorPeca } from '@/components/projetos/EditorPeca';
 import { MedicaoProjeto } from '@/components/projetos/MedicaoProjeto';
 import { Condicao, listarCondicoes } from '@/api/financeiro';
 import { receberPedido } from '@/api/estoque';
+import { MiniaturaAmpliavel } from '@/components/imagem/MiniaturaAmpliavel';
 import { BotaoListaCompraPdf } from '@/components/projetos/BotaoListaCompraPdf';
 import { compartilharPdf } from '@/pdf/gerarPdf';
 import { QuaisItens, htmlListaCompra, tituloListaCompra } from '@/pdf/listaCompraHtml';
@@ -661,6 +662,9 @@ export default function EditorProjeto() {
                     color={p.concluida ? '#1E6B3A' : COR.linha}
                   />
                 </Pressable>
+                {!!p.produto_miniatura_url && (
+                  <MiniaturaAmpliavel miniatura={p.produto_miniatura_url} imagem={p.produto_imagem_url} titulo={p.nome} tamanho={44} />
+                )}
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.pecaNome, p.concluida && styles.pecaConcluida]}>
                     {p.nome}

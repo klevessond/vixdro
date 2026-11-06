@@ -97,11 +97,13 @@ export function htmlOrcamento({ projeto, calculo, vidraceiro, cliente, logo }: D
   const temDesconto = parseFloat(o.desconto) > 0;
   const nomeEmpresa = vidraceiro.empresa || vidraceiro.nome;
 
+  // A foto do produto de cada peça (o cálculo vem na mesma ordem das peças do projeto).
+  const foto = (i: number) => projeto.linhas[i]?.produto_miniatura_url;
   const linhas = calculo.linhas
     .map(
-      (l) => `
+      (l, i) => `
       <tr>
-        <td><strong>${esc(l.nome)}</strong>${medidas(l.largura_mm, l.altura_mm)}</td>
+        <td>${foto(i) ? `<div class="peca"><img src="${esc(foto(i)!)}" alt=""><div>` : ''}<strong>${esc(l.nome)}</strong>${medidas(l.largura_mm, l.altura_mm)}${foto(i) ? '</div></div>' : ''}</td>
         <td class="centro">${l.quantidade}</td>
         <td class="direita">${reais(l.preco_unitario)}</td>
         <td class="direita">${reais(l.preco_total)}</td>
@@ -131,6 +133,8 @@ export function htmlOrcamento({ projeto, calculo, vidraceiro, cliente, logo }: D
   .totais { margin-left: auto; width: 55%; margin-top: 12px; }
   .totais div { display: flex; justify-content: space-between; padding: 4px 4px; }
   .total { border-top: 2px solid #1E5B57; margin-top: 4px; padding-top: 8px !important; font-size: 16px; font-weight: 800; color: #1E5B57; }
+  .peca { display: flex; align-items: center; gap: 10px; }
+  .peca img { width: 52px; height: 52px; object-fit: cover; border-radius: 6px; border: 1px solid #D6E1DF; }
   .pagamento { margin-top: 22px; border: 1px solid #D6E1DF; border-radius: 6px; padding: 10px 14px; }
   .pagamento h3 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #1E5B57; }
   .pagamento div { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; }

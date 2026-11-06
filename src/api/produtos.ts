@@ -178,8 +178,9 @@ export async function removerImagemProduto(id: string): Promise<Produto> {
 }
 
 /** Cria uma cópia própria (ex: de um modelo pronto), que o vidraceiro edita à vontade. */
-export async function duplicarProduto(id: string): Promise<Produto> {
-  const res = await apiFetch(`/produtos/${id}/duplicar/`, { method: 'POST' });
+/** Cópia própria (de um modelo pronto ou de um produto seu), com a foto. Sem nome, o servidor sugere um. */
+export async function duplicarProduto(id: string, nome = ''): Promise<Produto> {
+  const res = await apiFetch(`/produtos/${id}/duplicar/`, { method: 'POST', body: JSON.stringify({ nome: nome.trim() }) });
   return lerResposta<Produto>(res, 'Não foi possível criar a cópia.');
 }
 

@@ -3,8 +3,9 @@
 // Escolhe o modelo (produto) que vai virar uma peça do projeto.
 
 import { useEffect, useState } from 'react';
-import { Image, ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { MiniaturaAmpliavel } from '@/components/imagem/MiniaturaAmpliavel';
 import { CATEGORIAS, Produto, listarProdutos } from '@/api/produtos';
 import { COR } from '@/components/produtos/cores';
 
@@ -64,7 +65,7 @@ export function SeletorProduto({ visivel, onSelecionar, onAvulsa, onFechar }: Pr
               onPress={() => onSelecionar(p)}
               style={({ pressed }) => [styles.linha, styles.linhaFoto, pressed && { backgroundColor: COR.bordaClara }]}
             >
-              {p.miniatura_url ? <Image source={{ uri: p.miniatura_url }} style={styles.miniatura} /> : null}
+              {p.miniatura_url ? <MiniaturaAmpliavel miniatura={p.miniatura_url} imagem={p.imagem_url} titulo={p.nome} /> : null}
               <View style={{ flex: 1 }}>
               <Text style={styles.nome}>
                 {p.nome}
